@@ -86,6 +86,7 @@ export default function VideoSourceConfig({
   const editButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const editNameRef = useRef<HTMLInputElement | null>(null);
   const restoreEditFocusRef = useRef(false);
+  const editingSourceKey = editingSource?.key;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -98,12 +99,11 @@ export default function VideoSourceConfig({
     if (config?.SourceConfig) {
       setSources(config.SourceConfig);
       setOrderChanged(false);
-      setCheckStates({});
     }
   }, [config]);
 
   useEffect(() => {
-    if (editingSource) {
+    if (editingSourceKey) {
       editNameRef.current?.focus();
     } else if (restoreEditFocusRef.current) {
       restoreEditFocusRef.current = false;
@@ -114,7 +114,7 @@ export default function VideoSourceConfig({
         }
       }, 0);
     }
-  }, [editingSource]);
+  }, [editingSourceKey]);
 
   useEffect(() => {
     if (!editingSource || savingEdit) return;

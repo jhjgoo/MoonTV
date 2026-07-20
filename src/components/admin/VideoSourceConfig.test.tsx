@@ -170,6 +170,10 @@ describe('VideoSourceConfig', () => {
       dialogQueries.getByRole('checkbox', { name: '启用此视频源' })
     ).toBeChecked();
     await waitFor(() => expect(nameInput).toHaveFocus());
+    fireEvent.change(nameInput, { target: { value: '   ' } });
+    expect(
+      dialogQueries.getByRole('button', { name: '保存修改' })
+    ).toBeDisabled();
 
     fireEvent.click(dialogQueries.getByRole('button', { name: '取消' }));
 
@@ -181,26 +185,76 @@ describe('VideoSourceConfig', () => {
     );
   });
 
-  test('submits edited fields, prevents duplicates, and clears stale health state', async () => {
-    let resolveUpdate: (response: Response) => void = () => undefined;
-    fetchMock
-      .mockResolvedValueOnce(
-        jsonResponse({ healthy: true, latencyMs: 25, message: '接口响应正常' })
-      )
-      .mockReturnValueOnce(
-        new Promise<Response>((resolve) => {
-          resolveUpdate = resolve;
-        })
-      );
+  test('shows a disabled custom source as not enabled in the dialog', () => {
+    const config = createConfig();
+    config.SourceConfig[0].disabled = true;
+    render(<VideoSourceConfig config={config} refreshConfig={refreshConfig} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '编辑 adult-source' }));
+
+    expect(
+      within(screen.getByRole('dialog')).getByRole('checkbox', {
+        name: '启用此视频源',
+      })
+    ).not.toBeChecked();
+  });
+
+  test('does not steal focus while editing fields other than the name', () => {
     render(
       <VideoSourceConfig
         config={createConfig()}
         refreshConfig={refreshConfig}
       />
     );
+    fireEvent.click(screen.getByRole('button', { name: '编辑 adult-source' }));
+    const dialog = screen.getByRole('dialog', { name: '编辑视频源' });
+    const apiInput = within(dialog).getByRole('textbox', {
+      name: 'API 地址',
+    });
+    apiInput.focus();
+
+    fireEvent.change(apiInput, {
+      target: { value: 'https://updated.example.com/api' },
+    });
+
+    expect(apiInput).toHaveFocus();
+  });
+
+  test('submits edited fields, prevents duplicates, and clears stale health state', async () => {
+    let resolveUpdate: (response: Response) => void = () => undefined;
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ healthy: true, latencyMs: 25, message: '接口响应正常' })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ healthy: true, latencyMs: 40, message: '接口响应正常' })
+      )
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveUpdate = resolve;
+        })
+      );
+    const config = createConfig();
+    const viewRef: { current?: ReturnType<typeof render> } = {};
+    const refreshAfterEdit = jest.fn(async () => {
+      viewRef.current?.rerender(
+        <VideoSourceConfig
+          config={{
+            ...config,
+            SourceConfig: config.SourceConfig.map((source) => ({ ...source })),
+          }}
+          refreshConfig={refreshAfterEdit}
+        />
+      );
+    });
+    viewRef.current = render(
+      <VideoSourceConfig config={config} refreshConfig={refreshAfterEdit} />
+    );
 
     fireEvent.click(screen.getAllByRole('button', { name: '检测' })[0]);
     expect(await screen.findByText('正常 · 25 ms')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '检测' })[1]);
+    expect(await screen.findByText('正常 · 40 ms')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '编辑 adult-source' }));
     const dialog = screen.getByRole('dialog', { name: '编辑视频源' });
     const dialogQueries = within(dialog);
@@ -233,7 +287,7 @@ describe('VideoSourceConfig', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     fireEvent.click(screen.getByTestId('edit-source-backdrop'));
     expect(screen.getByRole('dialog', { name: '编辑视频源' })).toBeVisible();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/admin/source',
       expect.objectContaining({
@@ -254,9 +308,10 @@ describe('VideoSourceConfig', () => {
       resolveUpdate(jsonResponse({ ok: true }));
     });
 
-    await waitFor(() => expect(refreshConfig).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(refreshAfterEdit).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getAllByText('未检测')).toHaveLength(2);
+    expect(screen.getAllByText('未检测')).toHaveLength(1);
+    expect(screen.getByText('正常 · 40 ms')).toBeInTheDocument();
   });
 
   test('keeps edited input and health state when saving fails', async () => {

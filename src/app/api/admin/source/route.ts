@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     // 获取配置与存储
     const adminConfig = await getConfig();
     const storage: IStorage | null = getStorage();
+    let configToPersist = adminConfig;
 
     // 权限与身份校验
     if (username !== process.env.USERNAME) {
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
         if (current.from === 'config') {
           return NextResponse.json({ error: '该源不可编辑' }, { status: 400 });
         }
-        adminConfig.SourceConfig[index] = normalizeAdminSource({
+        const updatedSource = normalizeAdminSource({
           key: current.key,
           name,
           api,
@@ -131,6 +132,12 @@ export async function POST(request: NextRequest) {
           disabled,
           from: current.from,
         });
+        configToPersist = {
+          ...adminConfig,
+          SourceConfig: adminConfig.SourceConfig.map((source, sourceIndex) =>
+            sourceIndex === index ? updatedSource : source
+          ),
+        };
         break;
       }
       case 'disable': {
@@ -197,7 +204,10 @@ export async function POST(request: NextRequest) {
 
     // 持久化到存储
     if (storage && typeof (storage as any).setAdminConfig === 'function') {
-      await (storage as any).setAdminConfig(adminConfig);
+      await (storage as any).setAdminConfig(configToPersist);
+    }
+    if (configToPersist !== adminConfig) {
+      adminConfig.SourceConfig = configToPersist.SourceConfig;
     }
 
     return NextResponse.json(

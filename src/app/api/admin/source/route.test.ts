@@ -139,14 +139,15 @@ describe('POST /api/admin/source', () => {
     } as never;
 
     const response = await POST(request);
+    const persistedConfig = setAdminConfig.mock.calls[0][0] as typeof config;
 
     expect(response.status).toBe(200);
-    expect(config.SourceConfig.map((source) => source.key)).toEqual([
+    expect(persistedConfig.SourceConfig.map((source) => source.key)).toEqual([
       'before',
       'target',
       'after',
     ]);
-    expect(config.SourceConfig[1]).toEqual({
+    expect(persistedConfig.SourceConfig[1]).toEqual({
       key: 'target',
       name: 'Updated',
       api: 'https://updated.example.com/api',
@@ -155,8 +156,8 @@ describe('POST /api/admin/source', () => {
       from: 'custom',
       disabled: true,
     });
+    expect(config.SourceConfig[1]).toEqual(persistedConfig.SourceConfig[1]);
     expect(setAdminConfig).toHaveBeenCalledTimes(1);
-    expect(setAdminConfig).toHaveBeenCalledWith(config);
   });
 
   test('rejects updates to built-in sources', async () => {
@@ -280,11 +281,49 @@ describe('POST /api/admin/source', () => {
     } as never;
 
     const response = await POST(request);
+    const persistedConfig = setAdminConfig.mock.calls[0][0] as typeof config;
 
     expect(response.status).toBe(200);
-    expect(config.SourceConfig[0]).toEqual(
+    expect(persistedConfig.SourceConfig[0]).toEqual(
       expect.objectContaining({ adult: false, disabled: false })
     );
+  });
+
+  test('does not mutate cached config when persistence fails', async () => {
+    const consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    const originalSource = {
+      key: 'custom',
+      name: 'Original',
+      api: 'https://original.example.com/api',
+      adult: false,
+      from: 'custom' as const,
+      disabled: false,
+    };
+    const config = {
+      ...createConfig(),
+      SourceConfig: [originalSource],
+    };
+    mockGetConfig.mockResolvedValue(config);
+    setAdminConfig.mockRejectedValueOnce(new Error('storage unavailable'));
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'custom',
+        name: 'Updated',
+        api: 'https://updated.example.com/api',
+        adult: true,
+        disabled: true,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(500);
+    expect(config.SourceConfig).toEqual([originalSource]);
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   test('allows an administrator to update a custom source', async () => {
@@ -325,9 +364,10 @@ describe('POST /api/admin/source', () => {
     } as never;
 
     const response = await POST(request);
+    const persistedConfig = setAdminConfig.mock.calls[0][0] as typeof config;
 
     expect(response.status).toBe(200);
-    expect(config.SourceConfig[0].name).toBe('Updated by admin');
+    expect(persistedConfig.SourceConfig[0].name).toBe('Updated by admin');
     expect(setAdminConfig).toHaveBeenCalledTimes(1);
   });
 
