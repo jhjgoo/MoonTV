@@ -70,7 +70,7 @@
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/app/api/admin/source/route.test.ts
+rtk pnpm test --runInBand src/app/api/admin/source/route.test.ts
 ```
 
 Expected: FAIL，响应为 HTTP 400「参数格式错误」。
@@ -142,7 +142,7 @@ case 'update': {
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/app/api/admin/source/route.test.ts
+rtk pnpm test --runInBand src/app/api/admin/source/route.test.ts
 ```
 
 Expected: PASS。
@@ -187,7 +187,7 @@ expect(
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/components/admin/VideoSourceConfig.test.tsx
+rtk pnpm test --runInBand src/components/admin/VideoSourceConfig.test.tsx
 ```
 
 Expected: FAIL，找不到「编辑 adult-source」按钮。
@@ -261,7 +261,7 @@ const [savingEdit, setSavingEdit] = useState(false);
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/components/admin/VideoSourceConfig.test.tsx
+rtk pnpm test --runInBand src/components/admin/VideoSourceConfig.test.tsx
 ```
 
 Expected: 操作按钮和预填测试 PASS。
@@ -298,7 +298,7 @@ expect(fetchMock).toHaveBeenCalledWith(
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/components/admin/VideoSourceConfig.test.tsx
+rtk pnpm test --runInBand src/components/admin/VideoSourceConfig.test.tsx
 ```
 
 Expected: FAIL，未调用 `fetch` 或未出现「保存中…」。
@@ -342,7 +342,7 @@ const handleSaveEdit = async () => {
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/components/admin/VideoSourceConfig.test.tsx
+rtk pnpm test --runInBand src/components/admin/VideoSourceConfig.test.tsx
 ```
 
 Expected: PASS。
@@ -354,7 +354,7 @@ Expected: PASS。
 Run:
 
 ```bash
-rtk pnpm test -- --runInBand src/components/admin/VideoSourceConfig.test.tsx
+rtk pnpm test --runInBand src/components/admin/VideoSourceConfig.test.tsx
 ```
 
 Expected: PASS。
@@ -378,7 +378,7 @@ rtk git commit -m "feat(视频源): 添加自定义源编辑弹窗"
 - [ ] **Step 1：运行相关测试**
 
 ```bash
-rtk pnpm test -- --runInBand src/app/api/admin/source/route.test.ts src/components/admin/VideoSourceConfig.test.tsx
+rtk pnpm test --runInBand src/app/api/admin/source/route.test.ts src/components/admin/VideoSourceConfig.test.tsx
 ```
 
 Expected: PASS，输出无未处理错误。
@@ -386,7 +386,7 @@ Expected: PASS，输出无未处理错误。
 - [ ] **Step 2：运行全量质量检查**
 
 ```bash
-rtk pnpm test -- --runInBand
+rtk pnpm test --runInBand
 rtk pnpm typecheck
 rtk pnpm lint
 rtk pnpm build
