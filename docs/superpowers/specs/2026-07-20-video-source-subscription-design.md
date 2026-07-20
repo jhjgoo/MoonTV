@@ -82,18 +82,35 @@ interface AdminSource {
 
 ### 文件配置
 
-`config.json` 中的视频源允许提供可选字段：
+文件配置与运行时视频源使用不同类型，避免把对象属性名中的 Key 与条目字段混为一谈：
 
 ```ts
-interface ApiSite {
+interface ConfigApiSite {
   name: string;
   api: string;
   detail?: string;
   adult?: boolean;
 }
+
+interface ApiSite extends ConfigApiSite {
+  key: string;
+  adult: boolean;
+}
 ```
 
-视频源 Key 来自 `api_site` 对象的属性名，不在条目对象内重复保存。从文件配置合并到管理配置时，同样使用 `site.adult === true` 归一化。
+`config.json` 的 `api_site` 保存 `Record<string, ConfigApiSite>`，视频源 Key 来自对象属性名，不在条目对象内重复保存。运行时搜索和管理配置使用带 Key 的 `ApiSite` 或 `AdminSource`。从文件配置合并到运行时配置时，同样使用 `site.adult === true` 归一化。
+
+### 统一归一化 seam
+
+新增 `normalizeAdminSource` 模块，以单一接口将不可信或旧版视频源数据转换成完整的 `AdminSource`。以下入口必须经过该模块：
+
+- `config.json` 和生成的运行时文件配置。
+- D1、Redis 与 Upstash 中保存的旧版 `AdminConfig.SourceConfig`。
+- 单源新增接口。
+- 订阅导入接口。
+- 管理配置重置流程。
+
+该模块统一完成字符串修剪、`adult` 布尔归一化和默认字段补全。订阅导入的有效条目固定写入 `from: 'custom'`、`disabled: false`；文件配置固定写入 `from: 'config'`。
 
 ## API 设计
 
@@ -133,6 +150,16 @@ interface ApiSite {
 8. 跳过已有 Key，收集无效条目。
 9. 将有效条目一次性合并到 `AdminConfig.SourceConfig`。
 10. 调用一次 `setAdminConfig` 持久化。
+
+订阅导入采用以下资源上限：
+
+- Base58 响应体最大 1 MiB。
+- 单个订阅最多 500 个条目。
+- 合并后的 `SourceConfig` 最多 1,000 个视频源。
+- Key 与名称修剪后最长 128 个字符。
+- API 与 Detail URL 最长 2,048 个字符。
+
+超出任一批次级上限时整次导入失败，不修改存储。响应体必须通过流式读取累计字节；不能先完整调用 `response.text()` 再判断大小。
 
 成功响应：
 
@@ -225,7 +252,11 @@ interface ApiSite {
 - 重定向次数限制和每跳重新校验。
 - 拒绝 localhost、私网、链路本地和保留 IP 字面量。
 
-订阅仅接受 HTTPS URL，不允许 URL 内嵌用户名或密码。建议限制为 3 次重定向、10 秒超时和 1 MB 响应体。
+订阅 URL、订阅条目中的 API URL，以及非空 Detail URL 均必须通过同一套公网 URL 校验：只接受 HTTPS，不允许内嵌用户名或密码，并拒绝显式的 localhost、私网、链路本地和保留 IP 字面量。不安全的 API 或 Detail 会让对应条目失败，不能静默丢弃 Detail 后继续导入。
+
+抓取限制为 3 次重定向和 10 秒超时。每次重定向使用 `redirect: 'manual'`，重新校验 `Location` 后才能继续。响应体通过 `ReadableStream` 累计读取，超过 1 MiB 时立即取消 Reader 并中止请求。
+
+Cloudflare Edge 无法使用 Node.js `dns.lookup` 对任意主机名执行可靠的私网解析检查，因此本次威胁模型保证拦截显式危险主机、IP 字面量和危险重定向，不宣称可以彻底防御 DNS rebinding。验收测试覆盖可确定验证的 URL 形式和重定向链。
 
 ### 联调检测模块
 
@@ -239,6 +270,12 @@ interface ApiSite {
 该模块返回结果，不修改视频源对象。
 
 ## 管理页面设计
+
+### 可测试模块 seam
+
+将当前内嵌在 `src/app/admin/page.tsx` 的 `VideoSourceConfig` 提取为独立模块。管理页只负责传入 `config` 与 `refreshConfig`，模块内部管理单源表单、订阅表单、检测状态和拖拽排序。
+
+独立模块复用 `AdminSource` 类型，不再维护一份局部 `DataSource` 结构。调用方和测试都通过同一个 Props 接口使用该模块，避免为了测试导入整个管理页面。
 
 ### 添加入口
 
@@ -287,7 +324,7 @@ interface ApiSite {
 顶层订阅有效后逐项处理：
 
 - Key、名称或 API 缺失：计入失败并跳过。
-- API URL 不合法：计入失败并跳过。
+- API 或非空 Detail URL 不合法、不安全或超过长度限制：计入失败并跳过。
 - Key 已存在：计入跳过，不覆盖。
 - `adult` 非布尔：归一化为 `false`，继续导入。
 - 额外字段：丢弃，不进入管理配置。
@@ -313,6 +350,8 @@ interface ApiSite {
 - `adult` 缺失。
 - `adult` 为 `"true"`、`1`、`null`、数组和对象时均为 `false`。
 - 额外字段被丢弃。
+- 有效订阅源固定归一化为 `from: 'custom'`、`disabled: false`。
+- 超过条目数、总源数或字段长度上限。
 
 ### 安全抓取单元测试
 
@@ -323,6 +362,9 @@ interface ApiSite {
 - 重定向次数上限。
 - 请求超时。
 - 响应体大小上限。
+- 通过流式读取在超过上限时立即取消。
+- 订阅条目中的 API 与 Detail 复用相同校验。
+- Cloudflare Edge 威胁模型仅承诺阻止可确定识别的危险目标。
 
 ### 订阅路由测试
 
@@ -356,6 +398,7 @@ interface ApiSite {
 - 🔞 列正确显示。
 - 检测状态在未检测、检测中、正常、异常之间转换。
 - 检测结果不写入源对象，刷新配置时清空。
+- `VideoSourceConfig` 可以通过独立 Props 接口渲染和测试。
 
 ## 验收标准
 
@@ -367,5 +410,5 @@ interface ApiSite {
 6. 检测能区分协议正常、HTTP 异常、超时和响应格式错误。
 7. 检测状态不写入 D1，不会自动禁用视频源。
 8. 非管理员无法导入订阅或检测视频源。
-9. 订阅无法访问被禁止的本地或私网目标。
+9. 订阅 URL、导入的 API 与 Detail 拒绝显式本地、私网、链路本地、保留 IP 及危险重定向；不对 DNS rebinding 作无法证明的绝对承诺。
 10. 新增自动化测试通过，现有构建、类型检查和代码规范检查不回归。
