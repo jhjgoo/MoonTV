@@ -48,3 +48,5 @@ public/workbox-*.js
 
 # local git worktrees
 /.worktrees/
+
+.worktrees/
