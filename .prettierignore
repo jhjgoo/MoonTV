@@ -40,5 +40,8 @@ CHANGELOG.md
 
 # generated files
 src/lib/runtime.ts
+public/manifest.json
+public/sw.js
+public/workbox-*.js
 
 pnpm-lock.yaml

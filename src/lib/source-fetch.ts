@@ -63,6 +63,7 @@ export async function fetchTextWithLimits(
         totalBytes += value.byteLength;
         if (totalBytes > maxBytes) {
           await reader.cancel();
+          controller.abort();
           throw new Error(`订阅响应过大（上限 ${maxBytes} 字节）`);
         }
         chunks.push(value);

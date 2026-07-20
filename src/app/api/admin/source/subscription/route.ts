@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, no-console */
+/* eslint-disable no-console */
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
 
     if (result.added > 0) {
       const storage: IStorage | null = getStorage();
-      if (!storage || typeof (storage as any).setAdminConfig !== 'function') {
+      if (!storage) {
         throw new Error('管理员配置存储不可用');
       }
       const nextSources = [...adminConfig.SourceConfig, ...result.sources];
-      await (storage as any).setAdminConfig({
+      await storage.setAdminConfig({
         ...adminConfig,
         SourceConfig: nextSources,
       });

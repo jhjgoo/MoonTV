@@ -129,6 +129,9 @@ describe('bounded source fetch', () => {
     ).rejects.toThrow('过大');
     expect(oversized.reader.read).toHaveBeenCalledTimes(2);
     expect(oversized.reader.cancel).toHaveBeenCalledTimes(1);
+    expect((fetchImpl.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(
+      true
+    );
   });
 
   test('rejects response bytes that are not valid UTF-8', async () => {
