@@ -38,6 +38,7 @@
 ### Task 1: Shared source model and normalization seam
 
 **Files:**
+
 - Create: `src/lib/source.types.ts`
 - Create: `src/lib/source-normalization.ts`
 - Test: `src/lib/source-normalization.test.ts`
@@ -184,6 +185,7 @@ git commit -m "feat(视频源): 统一视频源类型与归一化"
 ### Task 2: Public URL policy and bounded fetch
 
 **Files:**
+
 - Create: `src/lib/source-url.ts`
 - Test: `src/lib/source-url.test.ts`
 - Create: `src/lib/source-fetch.ts`
@@ -263,6 +265,7 @@ git commit -m "feat(视频源): 添加安全受限的订阅抓取"
 ### Task 3: Base58 subscription parser and import contract
 
 **Files:**
+
 - Create: `src/lib/source-subscription.ts`
 - Test: `src/lib/source-subscription.test.ts`
 
@@ -328,6 +331,7 @@ git commit -m "feat(视频源): 解析并校验 Base58 订阅"
 ### Task 4: Independent subscription route
 
 **Files:**
+
 - Create: `src/app/api/admin/source/subscription/route.ts`
 - Test: `src/app/api/admin/source/subscription/route.test.ts`
 
@@ -359,6 +363,7 @@ git commit -m "feat(视频源): 添加独立订阅导入接口"
 ### Task 5: Health probe and independent check route
 
 **Files:**
+
 - Create: `src/lib/source-health.ts`
 - Test: `src/lib/source-health.test.ts`
 - Create: `src/app/api/admin/source/check/route.ts`
@@ -409,6 +414,7 @@ git commit -m "feat(视频源): 添加独立联调检测接口"
 ### Task 6: Individual adult field and extracted admin UI
 
 **Files:**
+
 - Modify: `src/app/api/admin/source/route.ts`
 - Create: `src/app/api/admin/source/route.test.ts`
 - Create: `src/components/admin/VideoSourceConfig.tsx`
@@ -464,6 +470,7 @@ git commit -m "feat(管理面板): 支持订阅导入与视频源检测"
 ### Task 7: Full verification and documentation alignment
 
 **Files:**
+
 - Modify only if verification exposes a concrete defect.
 
 - [ ] **Step 1: Run the complete test suite**

@@ -43,7 +43,7 @@ MoonTV 的非 `localStorage` 部署模式支持在管理面板中动态维护视
 订阅导入采用宽容归一化：
 
 ```ts
-adult: source.adult === true
+adult: source.adult === true;
 ```
 
 只有严格布尔值 `true` 会保留为 `true`。字段缺失、`false`、字符串、数字、`null`、数组或对象均归一化为 `false`，不会导致条目失败或被跳过。
