@@ -19,6 +19,7 @@ const ACTIONS = [
   'setAllowRegister',
   'changePassword',
   'deleteUser',
+  'setAdultAccess',
 ] as const;
 
 export async function POST(request: NextRequest) {
@@ -45,11 +46,13 @@ export async function POST(request: NextRequest) {
       targetUsername, // 目标用户名
       targetPassword, // 目标用户密码（仅在添加用户时需要）
       allowRegister,
+      adult,
       action,
     } = body as {
       targetUsername?: string;
       targetPassword?: string;
       allowRegister?: boolean;
+      adult?: boolean;
       action?: (typeof ACTIONS)[number];
     };
 
@@ -65,6 +68,7 @@ export async function POST(request: NextRequest) {
       action !== 'setAllowRegister' &&
       action !== 'changePassword' &&
       action !== 'deleteUser' &&
+      action !== 'setAdultAccess' &&
       username === targetUsername
     ) {
       return NextResponse.json(
@@ -99,7 +103,8 @@ export async function POST(request: NextRequest) {
     if (
       targetEntry &&
       targetEntry.role === 'owner' &&
-      action !== 'changePassword'
+      action !== 'changePassword' &&
+      action !== 'setAdultAccess'
     ) {
       return NextResponse.json({ error: '无法操作站长' }, { status: 400 });
     }
@@ -136,6 +141,7 @@ export async function POST(request: NextRequest) {
           adminConfig.UserConfig.Users.push({
             username: targetUsername!,
             role: 'user',
+            adult: false,
           });
           targetEntry =
             adminConfig.UserConfig.Users[
@@ -304,6 +310,22 @@ export async function POST(request: NextRequest) {
             adminConfig.UserConfig.Users.splice(userIndex, 1);
           }
 
+          break;
+        }
+        case 'setAdultAccess': {
+          if (!targetEntry) {
+            return NextResponse.json(
+              { error: '目标用户不存在' },
+              { status: 404 }
+            );
+          }
+          if (typeof adult !== 'boolean') {
+            return NextResponse.json({ error: '参数格式错误' }, { status: 400 });
+          }
+          if (operatorRole === 'admin' && targetEntry.role !== 'user') {
+            return NextResponse.json({ error: '权限不足' }, { status: 403 });
+          }
+          targetEntry.adult = adult;
           break;
         }
         default:

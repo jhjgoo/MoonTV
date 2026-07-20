@@ -9,6 +9,7 @@ import {
   normalizeAdminSource,
   normalizeConfigSource,
 } from './source-normalization';
+import { normalizeAdultAccess } from './source-access';
 
 export type { ApiSite } from './source.types';
 
@@ -92,6 +93,9 @@ async function initConfig() {
       const customCategories = fileConfig.custom_category || [];
 
       if (adminConfig) {
+        adminConfig.UserConfig.Users = (adminConfig.UserConfig.Users || []).map(
+          (user) => ({ ...user, adult: normalizeAdultAccess(user.adult) })
+        );
         // 补全 SourceConfig
         const sourceConfigMap = new Map(
           (adminConfig.SourceConfig || []).map((source) => {
@@ -160,6 +164,7 @@ async function initConfig() {
             adminConfig!.UserConfig.Users.push({
               username: uname,
               role: 'user',
+              adult: false,
             });
           }
         });
@@ -172,6 +177,7 @@ async function initConfig() {
           adminConfig!.UserConfig.Users.unshift({
             username: ownerUser,
             role: 'owner',
+            adult: false,
           });
         }
       } else {
@@ -179,6 +185,7 @@ async function initConfig() {
         let allUsers = userNames.map((uname) => ({
           username: uname,
           role: 'user',
+          adult: false,
         }));
         const ownerUser = process.env.USERNAME;
         if (ownerUser) {
@@ -186,6 +193,7 @@ async function initConfig() {
           allUsers.unshift({
             username: ownerUser,
             role: 'owner',
+            adult: false,
           });
         }
         adminConfig = {
@@ -277,6 +285,9 @@ export async function getConfig(): Promise<AdminConfig> {
     adminConfig = await (storage as any).getAdminConfig();
   }
   if (adminConfig) {
+    adminConfig.UserConfig.Users = (adminConfig.UserConfig.Users || []).map(
+      (user) => ({ ...user, adult: normalizeAdultAccess(user.adult) })
+    );
     // 确保 CustomCategories 被初始化
     if (!adminConfig.CustomCategories) {
       adminConfig.CustomCategories = [];
@@ -358,6 +369,7 @@ export async function getConfig(): Promise<AdminConfig> {
       adminConfig.UserConfig.Users.unshift({
         username: ownerUser,
         role: 'owner',
+        adult: false,
       });
     }
     cachedConfig = adminConfig;
@@ -401,6 +413,7 @@ export async function resetConfig() {
   let allUsers = userNames.map((uname) => ({
     username: uname,
     role: 'user',
+    adult: false,
   }));
   const ownerUser = process.env.USERNAME;
   if (ownerUser) {
@@ -408,6 +421,7 @@ export async function resetConfig() {
     allUsers.unshift({
       username: ownerUser,
       role: 'owner',
+      adult: false,
     });
   }
   const adminConfig = {
