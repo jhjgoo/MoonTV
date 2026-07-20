@@ -4,19 +4,17 @@ import { getStorage } from '@/lib/db';
 
 import { AdminConfig } from './admin.types';
 import runtimeConfig from './runtime';
+import type { ApiSite, ConfigApiSite } from './source.types';
+import {
+  normalizeAdminSource,
+  normalizeConfigSource,
+} from './source-normalization';
 
-export interface ApiSite {
-  key: string;
-  api: string;
-  name: string;
-  detail?: string;
-}
+export type { ApiSite } from './source.types';
 
 interface ConfigFileStruct {
   cache_time?: number;
-  api_site: {
-    [key: string]: ApiSite;
-  };
+  api_site: Record<string, ConfigApiSite>;
   custom_category?: {
     name?: string;
     type: 'movie' | 'tv';
@@ -96,17 +94,17 @@ async function initConfig() {
       if (adminConfig) {
         // 补全 SourceConfig
         const sourceConfigMap = new Map(
-          (adminConfig.SourceConfig || []).map((s) => [s.key, s])
+          (adminConfig.SourceConfig || []).map((source) => {
+            const normalized = normalizeAdminSource(source);
+            return [normalized.key, normalized] as const;
+          })
         );
 
         apiSiteEntries.forEach(([key, site]) => {
+          const existing = sourceConfigMap.get(key);
           sourceConfigMap.set(key, {
-            key,
-            name: site.name,
-            api: site.api,
-            detail: site.detail,
-            from: 'config',
-            disabled: false,
+            ...normalizeConfigSource(key, site),
+            disabled: existing?.disabled === true,
           });
         });
 
@@ -208,14 +206,9 @@ async function initConfig() {
             AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
             Users: allUsers as any,
           },
-          SourceConfig: apiSiteEntries.map(([key, site]) => ({
-            key,
-            name: site.name,
-            api: site.api,
-            detail: site.detail,
-            from: 'config',
-            disabled: false,
-          })),
+          SourceConfig: apiSiteEntries.map(([key, site]) =>
+            normalizeConfigSource(key, site)
+          ),
           CustomCategories: customCategories.map((category) => ({
             name: category.name,
             type: category.type,
@@ -256,14 +249,9 @@ async function initConfig() {
         AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
         Users: [],
       },
-      SourceConfig: Object.entries(fileConfig.api_site).map(([key, site]) => ({
-        key,
-        name: site.name,
-        api: site.api,
-        detail: site.detail,
-        from: 'config',
-        disabled: false,
-      })),
+      SourceConfig: Object.entries(fileConfig.api_site).map(([key, site]) =>
+        normalizeConfigSource(key, site)
+      ),
       CustomCategories:
         fileConfig.custom_category?.map((category) => ({
           name: category.name,
@@ -312,27 +300,22 @@ export async function getConfig(): Promise<AdminConfig> {
     fileConfig = runtimeConfig as unknown as ConfigFileStruct;
     const apiSiteEntries = Object.entries(fileConfig.api_site);
     const sourceConfigMap = new Map(
-      (adminConfig.SourceConfig || []).map((s) => [s.key, s])
+      (adminConfig.SourceConfig || []).map((source) => {
+        const normalized = normalizeAdminSource(source);
+        return [normalized.key, normalized] as const;
+      })
     );
 
     apiSiteEntries.forEach(([key, site]) => {
       const existingSource = sourceConfigMap.get(key);
       if (existingSource) {
-        // 如果已存在，只覆盖 name、api、detail 和 from
-        existingSource.name = site.name;
-        existingSource.api = site.api;
-        existingSource.detail = site.detail;
-        existingSource.from = 'config';
+        sourceConfigMap.set(key, {
+          ...normalizeConfigSource(key, site),
+          disabled: existingSource.disabled === true,
+        });
       } else {
         // 如果不存在，创建新条目
-        sourceConfigMap.set(key, {
-          key,
-          name: site.name,
-          api: site.api,
-          detail: site.detail,
-          from: 'config',
-          disabled: false,
-        });
+        sourceConfigMap.set(key, normalizeConfigSource(key, site));
       }
     });
 
@@ -445,14 +428,9 @@ export async function resetConfig() {
       AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
       Users: allUsers as any,
     },
-    SourceConfig: apiSiteEntries.map(([key, site]) => ({
-      key,
-      name: site.name,
-      api: site.api,
-      detail: site.detail,
-      from: 'config',
-      disabled: false,
-    })),
+    SourceConfig: apiSiteEntries.map(([key, site]) =>
+      normalizeConfigSource(key, site)
+    ),
     CustomCategories:
       storageType === 'redis'
         ? customCategories?.map((category) => ({
@@ -490,5 +468,6 @@ export async function getAvailableApiSites(): Promise<ApiSite[]> {
     name: s.name,
     api: s.api,
     detail: s.detail,
+    adult: s.adult,
   }));
 }

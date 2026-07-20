@@ -1,3 +1,5 @@
+import type { AdminSource } from './source.types';
+
 export interface AdminConfig {
   SiteConfig: {
     SiteName: string;
@@ -16,14 +18,7 @@ export interface AdminConfig {
       banned?: boolean;
     }[];
   };
-  SourceConfig: {
-    key: string;
-    name: string;
-    api: string;
-    detail?: string;
-    from: 'config' | 'custom';
-    disabled?: boolean;
-  }[];
+  SourceConfig: AdminSource[];
   CustomCategories: {
     name?: string;
     type: 'movie' | 'tv';

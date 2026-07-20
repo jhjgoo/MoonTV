@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
 import { getStorage } from '@/lib/db';
+import { normalizeAdminSource } from '@/lib/source-normalization';
 import { IStorage } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -59,11 +60,12 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'add': {
-        const { key, name, api, detail } = body as {
+        const { key, name, api, detail, adult } = body as {
           key?: string;
           name?: string;
           api?: string;
           detail?: string;
+          adult?: unknown;
         };
         if (!key || !name || !api) {
           return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
@@ -71,14 +73,17 @@ export async function POST(request: NextRequest) {
         if (adminConfig.SourceConfig.some((s) => s.key === key)) {
           return NextResponse.json({ error: '该源已存在' }, { status: 400 });
         }
-        adminConfig.SourceConfig.push({
-          key,
-          name,
-          api,
-          detail,
-          from: 'custom',
-          disabled: false,
-        });
+        adminConfig.SourceConfig.push(
+          normalizeAdminSource({
+            key,
+            name,
+            api,
+            detail,
+            adult,
+            from: 'custom',
+            disabled: false,
+          })
+        );
         break;
       }
       case 'disable': {
