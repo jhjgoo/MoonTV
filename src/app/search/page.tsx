@@ -163,7 +163,8 @@ function SearchPageClient() {
     try {
       setIsLoading(true);
       const response = await fetch(
-        `/api/search?q=${encodeURIComponent(query.trim())}`
+        `/api/search?q=${encodeURIComponent(query.trim())}`,
+        { cache: 'no-store' }
       );
       const data = await response.json();
       let results = data.results;
