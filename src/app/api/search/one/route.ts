@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { matchesAdultKeyword } from '@/lib/adult-keywords';
 import { getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
 import {
@@ -7,7 +8,6 @@ import {
   assertSourceAccessible,
   getCurrentAdultAccess,
 } from '@/lib/source-access';
-import { yellowWords } from '@/lib/yellow';
 
 export const runtime = 'edge';
 
@@ -44,11 +44,9 @@ export async function GET(request: Request) {
       );
     }
 
+    const hasAdultAccess = await getCurrentAdultAccess(request as never);
     try {
-      assertSourceAccessible(
-        targetSite,
-        await getCurrentAdultAccess(request as never)
-      );
+      assertSourceAccessible(targetSite, hasAdultAccess);
     } catch (error) {
       if (
         error instanceof Error &&
@@ -63,12 +61,17 @@ export async function GET(request: Request) {
     }
 
     const results = await searchFromApi(targetSite, query);
-    let result = results.filter((r) => r.title === query);
-    if (!config.SiteConfig.DisableYellowFilter) {
-      result = result.filter((result) => {
-        const typeName = result.type_name || '';
-        return !yellowWords.some((word: string) => typeName.includes(word));
-      });
+    const result = results.filter((r) => r.title === query);
+    if (
+      !hasAdultAccess &&
+      result.some((item) =>
+        matchesAdultKeyword(item, config.SiteConfig.AdultKeywords)
+      )
+    ) {
+      return NextResponse.json(
+        { error: ADULT_ACCESS_DENIED_MESSAGE, result: null },
+        { status: 403 }
+      );
     }
     if (result.length === 0) {
       return NextResponse.json(

@@ -8,7 +8,7 @@ export interface AdminConfig {
     SiteInterfaceCacheTime: number;
     ImageProxy: string;
     DoubanProxy: string;
-    DisableYellowFilter: boolean;
+    AdultKeywords: string[];
   };
   UserConfig: {
     AllowRegister: boolean;

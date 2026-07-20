@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       SiteInterfaceCacheTime,
       ImageProxy,
       DoubanProxy,
-      DisableYellowFilter,
+      AdultKeywords,
     } = body as {
       SiteName: string;
       Announcement: string;
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       SiteInterfaceCacheTime: number;
       ImageProxy: string;
       DoubanProxy: string;
-      DisableYellowFilter: boolean;
+      AdultKeywords: string[];
     };
 
     // 参数校验
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       typeof SiteInterfaceCacheTime !== 'number' ||
       typeof ImageProxy !== 'string' ||
       typeof DoubanProxy !== 'string' ||
-      typeof DisableYellowFilter !== 'boolean'
+      !Array.isArray(AdultKeywords)
     ) {
       return NextResponse.json({ error: '参数格式错误' }, { status: 400 });
     }
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       SiteInterfaceCacheTime,
       ImageProxy,
       DoubanProxy,
-      DisableYellowFilter,
+      AdultKeywords,
     };
 
     // 写入数据库

@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+import { matchesAdultKeyword } from '@/lib/adult-keywords';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
@@ -38,6 +39,10 @@ export async function GET(request: NextRequest) {
         config.SourceConfig.find((site) => site.key === source),
         hasAdultAccess
       );
+    const canAccessFavorite = (source: string, favorite: Favorite) =>
+      canAccess(source) &&
+      (hasAdultAccess ||
+        !matchesAdultKeyword(favorite, config.SiteConfig.AdultKeywords));
 
     // 查询单条收藏
     if (key) {
@@ -55,15 +60,21 @@ export async function GET(request: NextRequest) {
         );
       }
       const fav = await db.getFavorite(authInfo.username, source, id);
+      if (fav && !canAccessFavorite(source, fav)) {
+        return NextResponse.json(
+          { error: ADULT_ACCESS_DENIED_MESSAGE },
+          { status: 403 }
+        );
+      }
       return NextResponse.json(fav, { status: 200 });
     }
 
     // 查询全部收藏
     const favorites = await db.getAllFavorites(authInfo.username);
     const accessibleFavorites = Object.fromEntries(
-      Object.entries(favorites).filter(([favoriteKey]) => {
+      Object.entries(favorites).filter(([favoriteKey, favorite]) => {
         const [source] = favoriteKey.split('+');
-        return source && canAccess(source);
+        return source && canAccessFavorite(source, favorite);
       })
     );
     return NextResponse.json(accessibleFavorites, { status: 200 });
@@ -117,7 +128,11 @@ export async function POST(request: NextRequest) {
     const config = await getConfig();
     const hasAdultAccess = await getCurrentAdultAccess(request);
     const site = config.SourceConfig.find((entry) => entry.key === source);
-    if (!canAccessSource(site, hasAdultAccess)) {
+    if (
+      !canAccessSource(site, hasAdultAccess) ||
+      (!hasAdultAccess &&
+        matchesAdultKeyword(favorite, config.SiteConfig.AdultKeywords))
+    ) {
       return NextResponse.json(
         { error: ADULT_ACCESS_DENIED_MESSAGE },
         { status: 403 }

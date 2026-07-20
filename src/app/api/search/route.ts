@@ -6,7 +6,7 @@ import {
   filterAccessibleSources,
   getCurrentAdultAccess,
 } from '@/lib/source-access';
-import { yellowWords } from '@/lib/yellow';
+import { matchesAdultKeyword } from '@/lib/adult-keywords';
 
 export const runtime = 'edge';
 
@@ -36,11 +36,11 @@ export async function GET(request: Request) {
   try {
     const results = await Promise.all(searchPromises);
     let flattenedResults = results.flat();
-    if (!config.SiteConfig.DisableYellowFilter) {
-      flattenedResults = flattenedResults.filter((result) => {
-        const typeName = result.type_name || '';
-        return !yellowWords.some((word: string) => typeName.includes(word));
-      });
+    if (!hasAdultAccess) {
+      flattenedResults = flattenedResults.filter(
+        (result) =>
+          !matchesAdultKeyword(result, config.SiteConfig.AdultKeywords)
+      );
     }
     return NextResponse.json(
       { results: flattenedResults },

@@ -3,6 +3,10 @@
 import { getStorage } from '@/lib/db';
 
 import { AdminConfig } from './admin.types';
+import {
+  DEFAULT_ADULT_KEYWORDS,
+  normalizeAdultKeywords,
+} from './adult-keywords';
 import runtimeConfig from './runtime';
 import { normalizeAdultAccess } from './source-access-core';
 import {
@@ -21,6 +25,23 @@ interface ConfigFileStruct {
     type: 'movie' | 'tv';
     query: string;
   }[];
+}
+
+function ensureAdultKeywords(config: AdminConfig): boolean {
+  const keywords = config.SiteConfig.AdultKeywords;
+  if (!Array.isArray(keywords)) {
+    config.SiteConfig.AdultKeywords = [...DEFAULT_ADULT_KEYWORDS];
+    return true;
+  }
+
+  const normalized = normalizeAdultKeywords(keywords);
+  const changed =
+    normalized.length !== keywords.length ||
+    normalized.some((keyword, index) => keyword !== keywords[index]);
+  if (changed) {
+    config.SiteConfig.AdultKeywords = normalized;
+  }
+  return changed;
 }
 
 export const API_CONFIG = {
@@ -93,6 +114,7 @@ async function initConfig() {
       const customCategories = fileConfig.custom_category || [];
 
       if (adminConfig) {
+        ensureAdultKeywords(adminConfig);
         adminConfig.UserConfig.Users = (adminConfig.UserConfig.Users || []).map(
           (user) => ({ ...user, adult: normalizeAdultAccess(user.adult) })
         );
@@ -207,8 +229,7 @@ async function initConfig() {
             SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
             ImageProxy: process.env.NEXT_PUBLIC_IMAGE_PROXY || '',
             DoubanProxy: process.env.NEXT_PUBLIC_DOUBAN_PROXY || '',
-            DisableYellowFilter:
-              process.env.NEXT_PUBLIC_DISABLE_YELLOW_FILTER === 'true',
+            AdultKeywords: [...DEFAULT_ADULT_KEYWORDS],
           },
           UserConfig: {
             AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -250,8 +271,7 @@ async function initConfig() {
         SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
         ImageProxy: process.env.NEXT_PUBLIC_IMAGE_PROXY || '',
         DoubanProxy: process.env.NEXT_PUBLIC_DOUBAN_PROXY || '',
-        DisableYellowFilter:
-          process.env.NEXT_PUBLIC_DISABLE_YELLOW_FILTER === 'true',
+        AdultKeywords: [...DEFAULT_ADULT_KEYWORDS],
       },
       UserConfig: {
         AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -285,6 +305,7 @@ export async function getConfig(): Promise<AdminConfig> {
     adminConfig = await (storage as any).getAdminConfig();
   }
   if (adminConfig) {
+    const adultKeywordsChanged = ensureAdultKeywords(adminConfig);
     adminConfig.UserConfig.Users = (adminConfig.UserConfig.Users || []).map(
       (user) => ({ ...user, adult: normalizeAdultAccess(user.adult) })
     );
@@ -304,8 +325,6 @@ export async function getConfig(): Promise<AdminConfig> {
       process.env.NEXT_PUBLIC_IMAGE_PROXY || '';
     adminConfig.SiteConfig.DoubanProxy =
       process.env.NEXT_PUBLIC_DOUBAN_PROXY || '';
-    adminConfig.SiteConfig.DisableYellowFilter =
-      process.env.NEXT_PUBLIC_DISABLE_YELLOW_FILTER === 'true';
 
     // 合并文件中的源信息
     fileConfig = runtimeConfig as unknown as ConfigFileStruct;
@@ -373,6 +392,13 @@ export async function getConfig(): Promise<AdminConfig> {
       });
     }
     cachedConfig = adminConfig;
+    if (
+      adultKeywordsChanged &&
+      storage &&
+      typeof (storage as any).setAdminConfig === 'function'
+    ) {
+      await (storage as any).setAdminConfig(adminConfig);
+    }
   } else {
     // DB 无配置，执行一次初始化
     await initConfig();
@@ -435,8 +461,7 @@ export async function resetConfig() {
       SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
       ImageProxy: process.env.NEXT_PUBLIC_IMAGE_PROXY || '',
       DoubanProxy: process.env.NEXT_PUBLIC_DOUBAN_PROXY || '',
-      DisableYellowFilter:
-        process.env.NEXT_PUBLIC_DISABLE_YELLOW_FILTER === 'true',
+      AdultKeywords: [...DEFAULT_ADULT_KEYWORDS],
     },
     UserConfig: {
       AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',

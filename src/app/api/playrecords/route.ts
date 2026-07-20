@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+import { matchesAdultKeyword } from '@/lib/adult-keywords';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
@@ -28,14 +29,16 @@ export async function GET(request: NextRequest) {
       getCurrentAdultAccess(request),
     ]);
     const accessibleRecords = Object.fromEntries(
-      Object.entries(records).filter(([recordKey]) => {
+      Object.entries(records).filter(([recordKey, record]) => {
         const [source] = recordKey.split('+');
         return (
           source &&
           canAccessSource(
             config.SourceConfig.find((site) => site.key === source),
             hasAdultAccess
-          )
+          ) &&
+          (hasAdultAccess ||
+            !matchesAdultKeyword(record, config.SiteConfig.AdultKeywords))
         );
       })
     );
@@ -87,7 +90,11 @@ export async function POST(request: NextRequest) {
     const config = await getConfig();
     const hasAdultAccess = await getCurrentAdultAccess(request);
     const site = config.SourceConfig.find((entry) => entry.key === source);
-    if (!canAccessSource(site, hasAdultAccess)) {
+    if (
+      !canAccessSource(site, hasAdultAccess) ||
+      (!hasAdultAccess &&
+        matchesAdultKeyword(record, config.SiteConfig.AdultKeywords))
+    ) {
       return NextResponse.json(
         { error: ADULT_ACCESS_DENIED_MESSAGE },
         { status: 403 }

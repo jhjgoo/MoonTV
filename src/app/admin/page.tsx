@@ -60,7 +60,7 @@ interface SiteConfig {
   SiteInterfaceCacheTime: number;
   ImageProxy: string;
   DoubanProxy: string;
-  DisableYellowFilter: boolean;
+  AdultKeywords: string[];
 }
 
 // 自定义分类数据类型
@@ -1053,7 +1053,7 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
     SiteInterfaceCacheTime: 7200,
     ImageProxy: '',
     DoubanProxy: '',
-    DisableYellowFilter: false,
+    AdultKeywords: [],
   });
   // 保存状态
   const [saving, setSaving] = useState(false);
@@ -1072,7 +1072,7 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
         ...config.SiteConfig,
         ImageProxy: config.SiteConfig.ImageProxy || '',
         DoubanProxy: config.SiteConfig.DoubanProxy || '',
-        DisableYellowFilter: config.SiteConfig.DisableYellowFilter || false,
+        AdultKeywords: config.SiteConfig.AdultKeywords || [],
       });
     }
   }, [config]);
@@ -1309,60 +1309,6 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
         </p>
       </div>
 
-      {/* 禁用黄色过滤器 */}
-      <div>
-        <div className='flex items-center justify-between'>
-          <label
-            className={`block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 ${
-              isD1Storage || isUpstashStorage ? 'opacity-50' : ''
-            }`}
-          >
-            禁用黄色过滤器
-            {isD1Storage && (
-              <span className='ml-2 text-xs text-gray-500 dark:text-gray-400'>
-                (D1 环境下请通过环境变量修改)
-              </span>
-            )}
-            {isUpstashStorage && (
-              <span className='ml-2 text-xs text-gray-500 dark:text-gray-400'>
-                (Upstash 环境下请通过环境变量修改)
-              </span>
-            )}
-          </label>
-          <button
-            type='button'
-            onClick={() =>
-              !isD1Storage &&
-              !isUpstashStorage &&
-              setSiteSettings((prev) => ({
-                ...prev,
-                DisableYellowFilter: !prev.DisableYellowFilter,
-              }))
-            }
-            disabled={isD1Storage || isUpstashStorage}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
-              siteSettings.DisableYellowFilter
-                ? 'bg-green-600'
-                : 'bg-gray-200 dark:bg-gray-700'
-            } ${
-              isD1Storage || isUpstashStorage
-                ? 'opacity-50 cursor-not-allowed'
-                : ''
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                siteSettings.DisableYellowFilter
-                  ? 'translate-x-6'
-                  : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
-        <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>
-          禁用黄色内容的过滤功能，允许显示所有内容。
-        </p>
-      </div>
 
       {/* 操作按钮 */}
       <div className='flex justify-end'>
@@ -1382,6 +1328,31 @@ const SiteConfigComponent = ({ config }: { config: AdminConfig | null }) => {
   );
 };
 
+const AdultKeywordConfig = ({ config, refreshConfig }: { config: AdminConfig | null; refreshConfig: () => Promise<void> }) => {
+  const [keyword, setKeyword] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [nextKeyword, setNextKeyword] = useState('');
+  const callApi = async (body: Record<string, string>) => {
+    const response = await fetch('/api/admin/adult-keyword', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || '关键词操作失败');
+    await refreshConfig();
+  };
+  const keywords = config?.SiteConfig.AdultKeywords || [];
+  return <div className='space-y-4'>
+    <p className='text-sm text-gray-500 dark:text-gray-400'>未开启🔞的用户，标题、分类或简介命中任一词条时将无法查看该内容。</p>
+    <div className='flex gap-2'>
+      <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder='输入关键词，例如：金瓶梅' className='flex-1 px-3 py-2 border rounded-lg bg-white dark:bg-gray-800' />
+      <button disabled={!keyword.trim()} onClick={() => callApi({ action: 'add', keyword }).then(() => { setKeyword(''); showSuccess('关键词已添加'); }).catch((e) => showError(e.message))} className='px-4 py-2 bg-green-600 disabled:bg-gray-400 text-white rounded-lg'>添加关键词</button>
+    </div>
+    <div className='border rounded-lg max-h-80 overflow-y-auto'>
+      {keywords.map((item) => <div key={item} className='flex gap-3 items-center px-4 py-3 border-b last:border-b-0'>
+        {editing === item ? <input autoFocus value={nextKeyword} onChange={(e) => setNextKeyword(e.target.value)} className='flex-1 px-2 py-1 border rounded' /> : <span className='flex-1'>{item}</span>}
+        {editing === item ? <><button onClick={() => callApi({ action: 'update', keyword: item, nextKeyword }).then(() => { setEditing(null); showSuccess('关键词已更新'); }).catch((e) => showError(e.message))} className='text-green-600'>保存</button><button onClick={() => setEditing(null)}>取消</button></> : <><button onClick={() => { setEditing(item); setNextKeyword(item); }} className='text-blue-600'>编辑</button><button onClick={() => callApi({ action: 'delete', keyword: item }).then(() => showSuccess('关键词已删除')).catch((e) => showError(e.message))} className='text-red-600'>删除</button></>}
+      </div>)}
+    </div>
+  </div>;
+};
+
 function AdminPageClient() {
   const [config, setConfig] = useState<AdminConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1391,6 +1362,7 @@ function AdminPageClient() {
     userConfig: false,
     videoSource: false,
     siteConfig: false,
+    adultKeywordConfig: false,
     categoryConfig: false,
   });
 
@@ -1518,6 +1490,15 @@ function AdminPageClient() {
             onToggle={() => toggleTab('siteConfig')}
           >
             <SiteConfigComponent config={config} />
+          </CollapsibleTab>
+
+          <CollapsibleTab
+            title='成人内容关键词'
+            icon={<Settings size={20} className='text-gray-600 dark:text-gray-400' />}
+            isExpanded={expandedTabs.adultKeywordConfig}
+            onToggle={() => toggleTab('adultKeywordConfig')}
+          >
+            <AdultKeywordConfig config={config} refreshConfig={fetchConfig} />
           </CollapsibleTab>
 
           <div className='space-y-4'>

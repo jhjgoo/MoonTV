@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { matchesAdultKeyword } from '@/lib/adult-keywords';
 import { getConfig } from '@/lib/config';
 import { getDetailFromApi } from '@/lib/downstream';
 import {
@@ -32,11 +33,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '无效的API来源' }, { status: 400 });
     }
 
+    const hasAdultAccess = await getCurrentAdultAccess(request as never);
     try {
-      assertSourceAccessible(
-        apiSite,
-        await getCurrentAdultAccess(request as never)
-      );
+      assertSourceAccessible(apiSite, hasAdultAccess);
     } catch (error) {
       if (
         error instanceof Error &&
@@ -51,6 +50,15 @@ export async function GET(request: Request) {
     }
 
     const result = await getDetailFromApi(apiSite, id);
+    if (
+      !hasAdultAccess &&
+      matchesAdultKeyword(result, config.SiteConfig.AdultKeywords)
+    ) {
+      return NextResponse.json(
+        { error: ADULT_ACCESS_DENIED_MESSAGE },
+        { status: 403 }
+      );
+    }
     return NextResponse.json(result, {
       headers: {
         'Cache-Control': 'no-store',
