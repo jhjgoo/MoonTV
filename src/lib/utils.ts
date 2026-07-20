@@ -28,6 +28,15 @@ export function getImageProxyUrl(): string | null {
     : null;
 }
 
+function isDoubanImageUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url, 'https://moontv.local').hostname;
+    return /^img\d+\.doubanio\.com$/.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 处理图片 URL，如果设置了图片代理则使用代理
  */
@@ -35,9 +44,15 @@ export function processImageUrl(originalUrl: string): string {
   if (!originalUrl) return originalUrl;
 
   const proxyUrl = getImageProxyUrl();
-  if (!proxyUrl) return originalUrl;
+  if (proxyUrl) {
+    return `${proxyUrl}${encodeURIComponent(originalUrl)}`;
+  }
 
-  return `${proxyUrl}${encodeURIComponent(originalUrl)}`;
+  if (isDoubanImageUrl(originalUrl)) {
+    return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+  }
+
+  return originalUrl;
 }
 
 /**
