@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 
 import { getCacheTime, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
+import {
+  ADULT_ACCESS_DENIED_MESSAGE,
+  assertSourceAccessible,
+  getCurrentAdultAccess,
+} from '@/lib/source-access';
 import { yellowWords } from '@/lib/yellow';
 
 export const runtime = 'edge';
@@ -40,6 +45,24 @@ export async function GET(request: Request) {
         },
         { status: 404 }
       );
+    }
+
+    try {
+      assertSourceAccessible(
+        targetSite,
+        await getCurrentAdultAccess(request as never)
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === ADULT_ACCESS_DENIED_MESSAGE
+      ) {
+        return NextResponse.json(
+          { error: ADULT_ACCESS_DENIED_MESSAGE, result: null },
+          { status: 403 }
+        );
+      }
+      throw error;
     }
 
     const results = await searchFromApi(targetSite, query);

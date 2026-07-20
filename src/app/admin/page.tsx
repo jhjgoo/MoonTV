@@ -195,6 +195,10 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
     await handleUserAction('cancelAdmin', uname);
   };
 
+  const handleSetAdultAccess = async (uname: string, adult: boolean) => {
+    await handleUserAction('setAdultAccess', uname, undefined, adult);
+  };
+
   const handleAddUser = async () => {
     if (!newUser.username || !newUser.password) return;
     await handleUserAction('add', newUser.username, newUser.password);
@@ -244,9 +248,11 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
       | 'setAdmin'
       | 'cancelAdmin'
       | 'changePassword'
-      | 'deleteUser',
+      | 'deleteUser'
+      | 'setAdultAccess',
     targetUsername: string,
-    targetPassword?: string
+    targetPassword?: string,
+    adult?: boolean
   ) => {
     try {
       const res = await fetch('/api/admin/user', {
@@ -255,6 +261,7 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
         body: JSON.stringify({
           targetUsername,
           ...(targetPassword ? { targetPassword } : {}),
+          ...(typeof adult === 'boolean' ? { adult } : {}),
           action,
         }),
       });
@@ -471,6 +478,12 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                 </th>
                 <th
                   scope='col'
+                  className='px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'
+                >
+                  🔞
+                </th>
+                <th
+                  scope='col'
                   className='px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider'
                 >
                   操作
@@ -511,6 +524,10 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                       user.username !== currentUsername &&
                       (role === 'owner' ||
                         (role === 'admin' && user.role === 'user'));
+
+                    const canManageAdult =
+                      role === 'owner' ||
+                      (role === 'admin' && user.role === 'user');
                     return (
                       <tr
                         key={user.username}
@@ -547,7 +564,35 @@ const UserConfig = ({ config, role, refreshConfig }: UserConfigProps) => {
                             {!user.banned ? '正常' : '已封禁'}
                           </span>
                         </td>
+                        <td className='px-6 py-4 whitespace-nowrap'>
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              user.adult === true
+                                ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            {user.adult === true ? '已开启' : '未开启'}
+                          </span>
+                        </td>
                         <td className='px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2'>
+                          {canManageAdult && (
+                            <button
+                              onClick={() =>
+                                handleSetAdultAccess(
+                                  user.username,
+                                  user.adult !== true
+                                )
+                              }
+                              className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                user.adult === true
+                                  ? 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700/40 dark:hover:bg-gray-700/60 dark:text-gray-200'
+                                  : 'bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900/40 dark:hover:bg-orange-900/60 dark:text-orange-200'
+                              }`}
+                            >
+                              {user.adult === true ? '关闭🔞' : '开启🔞'}
+                            </button>
+                          )}
                           {/* 修改密码按钮 */}
                           {canChangePassword && (
                             <button

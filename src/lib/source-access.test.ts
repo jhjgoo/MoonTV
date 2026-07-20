@@ -1,9 +1,10 @@
 import type { AdminSource } from './source.types';
 import {
   assertSourceAccessible,
+  canAccessSource,
   filterAccessibleSources,
   normalizeAdultAccess,
-} from './source-access';
+} from './source-access-core';
 
 const safeSource: AdminSource = {
   key: 'safe',
@@ -46,5 +47,10 @@ describe('source access control', () => {
     expect(() => assertSourceAccessible(adultSource, false)).toThrow(
       '未开启成人内容访问权限'
     );
+  });
+
+  test('reports whether a source can be accessed without throwing', () => {
+    expect(canAccessSource(adultSource, false)).toBe(false);
+    expect(canAccessSource(adultSource, true)).toBe(true);
   });
 });

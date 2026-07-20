@@ -3,7 +3,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
+import { getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
+import {
+  ADULT_ACCESS_DENIED_MESSAGE,
+  canAccessSource,
+  getCurrentAdultAccess,
+} from '@/lib/source-access';
 import { PlayRecord } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -16,8 +22,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const records = await db.getAllPlayRecords(authInfo.username);
-    return NextResponse.json(records, { status: 200 });
+    const [records, config, hasAdultAccess] = await Promise.all([
+      db.getAllPlayRecords(authInfo.username),
+      getConfig(),
+      getCurrentAdultAccess(request),
+    ]);
+    const accessibleRecords = Object.fromEntries(
+      Object.entries(records).filter(([recordKey]) => {
+        const [source] = recordKey.split('+');
+        return (
+          source &&
+          canAccessSource(
+            config.SourceConfig.find((site) => site.key === source),
+            hasAdultAccess
+          )
+        );
+      })
+    );
+    return NextResponse.json(accessibleRecords, { status: 200 });
   } catch (err) {
     console.error('获取播放记录失败', err);
     return NextResponse.json(
@@ -59,6 +81,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid key format' },
         { status: 400 }
+      );
+    }
+
+    const config = await getConfig();
+    const hasAdultAccess = await getCurrentAdultAccess(request);
+    const site = config.SourceConfig.find((entry) => entry.key === source);
+    if (!canAccessSource(site, hasAdultAccess)) {
+      return NextResponse.json(
+        { error: ADULT_ACCESS_DENIED_MESSAGE },
+        { status: 403 }
       );
     }
 

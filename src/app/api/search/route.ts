@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 import { getCacheTime, getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
+import {
+  filterAccessibleSources,
+  getCurrentAdultAccess,
+} from '@/lib/source-access';
 import { yellowWords } from '@/lib/yellow';
 
 export const runtime = 'edge';
@@ -25,7 +29,11 @@ export async function GET(request: Request) {
   }
 
   const config = await getConfig();
-  const apiSites = config.SourceConfig.filter((site) => !site.disabled);
+  const hasAdultAccess = await getCurrentAdultAccess(request as never);
+  const apiSites = filterAccessibleSources(
+    config.SourceConfig.filter((site) => !site.disabled),
+    hasAdultAccess
+  );
   const searchPromises = apiSites.map((site) => searchFromApi(site, query));
 
   try {

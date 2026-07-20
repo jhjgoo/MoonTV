@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 
-import { getAvailableApiSites, getCacheTime } from '@/lib/config';
+import { getCacheTime, getConfig } from '@/lib/config';
 import { getDetailFromApi } from '@/lib/downstream';
+import {
+  ADULT_ACCESS_DENIED_MESSAGE,
+  assertSourceAccessible,
+  getCurrentAdultAccess,
+} from '@/lib/source-access';
 
 export const runtime = 'edge';
 
@@ -19,11 +24,30 @@ export async function GET(request: Request) {
   }
 
   try {
-    const apiSites = await getAvailableApiSites();
+    const config = await getConfig();
+    const apiSites = config.SourceConfig.filter((site) => !site.disabled);
     const apiSite = apiSites.find((site) => site.key === sourceCode);
 
     if (!apiSite) {
       return NextResponse.json({ error: '无效的API来源' }, { status: 400 });
+    }
+
+    try {
+      assertSourceAccessible(
+        apiSite,
+        await getCurrentAdultAccess(request as never)
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === ADULT_ACCESS_DENIED_MESSAGE
+      ) {
+        return NextResponse.json(
+          { error: ADULT_ACCESS_DENIED_MESSAGE },
+          { status: 403 }
+        );
+      }
+      throw error;
     }
 
     const result = await getDetailFromApi(apiSite, id);

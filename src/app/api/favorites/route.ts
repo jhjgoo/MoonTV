@@ -3,7 +3,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
+import { getConfig } from '@/lib/config';
 import { db } from '@/lib/db';
+import {
+  ADULT_ACCESS_DENIED_MESSAGE,
+  canAccessSource,
+  getCurrentAdultAccess,
+} from '@/lib/source-access';
 import { Favorite } from '@/lib/types';
 
 export const runtime = 'edge';
@@ -25,6 +31,13 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const key = searchParams.get('key');
+    const config = await getConfig();
+    const hasAdultAccess = await getCurrentAdultAccess(request);
+    const canAccess = (source: string) =>
+      canAccessSource(
+        config.SourceConfig.find((site) => site.key === source),
+        hasAdultAccess
+      );
 
     // 查询单条收藏
     if (key) {
@@ -35,13 +48,25 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
+      if (!canAccess(source)) {
+        return NextResponse.json(
+          { error: ADULT_ACCESS_DENIED_MESSAGE },
+          { status: 403 }
+        );
+      }
       const fav = await db.getFavorite(authInfo.username, source, id);
       return NextResponse.json(fav, { status: 200 });
     }
 
     // 查询全部收藏
     const favorites = await db.getAllFavorites(authInfo.username);
-    return NextResponse.json(favorites, { status: 200 });
+    const accessibleFavorites = Object.fromEntries(
+      Object.entries(favorites).filter(([favoriteKey]) => {
+        const [source] = favoriteKey.split('+');
+        return source && canAccess(source);
+      })
+    );
+    return NextResponse.json(accessibleFavorites, { status: 200 });
   } catch (err) {
     console.error('获取收藏失败', err);
     return NextResponse.json(
@@ -86,6 +111,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid key format' },
         { status: 400 }
+      );
+    }
+
+    const config = await getConfig();
+    const hasAdultAccess = await getCurrentAdultAccess(request);
+    const site = config.SourceConfig.find((entry) => entry.key === source);
+    if (!canAccessSource(site, hasAdultAccess)) {
+      return NextResponse.json(
+        { error: ADULT_ACCESS_DENIED_MESSAGE },
+        { status: 403 }
       );
     }
 

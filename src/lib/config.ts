@@ -4,12 +4,12 @@ import { getStorage } from '@/lib/db';
 
 import { AdminConfig } from './admin.types';
 import runtimeConfig from './runtime';
-import type { ApiSite, ConfigApiSite } from './source.types';
+import { normalizeAdultAccess } from './source-access-core';
 import {
   normalizeAdminSource,
   normalizeConfigSource,
 } from './source-normalization';
-import { normalizeAdultAccess } from './source-access';
+import type { ApiSite, ConfigApiSite } from './source.types';
 
 export type { ApiSite } from './source.types';
 
