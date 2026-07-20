@@ -42,7 +42,7 @@ function createConfig() {
   };
 }
 
-describe('POST /api/admin/source add adult metadata', () => {
+describe('POST /api/admin/source', () => {
   const setAdminConfig = jest.fn();
 
   beforeEach(() => {
@@ -92,5 +92,271 @@ describe('POST /api/admin/source add adult metadata', () => {
       }),
     ]);
     expect(setAdminConfig).toHaveBeenCalledTimes(1);
+  });
+
+  test('updates a custom source in place and preserves its identity', async () => {
+    const config = {
+      ...createConfig(),
+      SourceConfig: [
+        {
+          key: 'before',
+          name: 'Before',
+          api: 'https://before.example.com/api',
+          adult: false,
+          from: 'custom' as const,
+          disabled: false,
+        },
+        {
+          key: 'target',
+          name: 'Target',
+          api: 'https://target.example.com/api',
+          detail: 'https://target.example.com/detail',
+          adult: false,
+          from: 'custom' as const,
+          disabled: false,
+        },
+        {
+          key: 'after',
+          name: 'After',
+          api: 'https://after.example.com/api',
+          adult: false,
+          from: 'config' as const,
+          disabled: false,
+        },
+      ],
+    };
+    mockGetConfig.mockResolvedValue(config);
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'target',
+        name: ' Updated ',
+        api: ' https://updated.example.com/api ',
+        detail: ' ',
+        adult: true,
+        disabled: true,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(config.SourceConfig.map((source) => source.key)).toEqual([
+      'before',
+      'target',
+      'after',
+    ]);
+    expect(config.SourceConfig[1]).toEqual({
+      key: 'target',
+      name: 'Updated',
+      api: 'https://updated.example.com/api',
+      detail: undefined,
+      adult: true,
+      from: 'custom',
+      disabled: true,
+    });
+    expect(setAdminConfig).toHaveBeenCalledTimes(1);
+    expect(setAdminConfig).toHaveBeenCalledWith(config);
+  });
+
+  test('rejects updates to built-in sources', async () => {
+    const config = {
+      ...createConfig(),
+      SourceConfig: [
+        {
+          key: 'built-in',
+          name: 'Built in',
+          api: 'https://built-in.example.com/api',
+          adult: false,
+          from: 'config' as const,
+          disabled: false,
+        },
+      ],
+    };
+    mockGetConfig.mockResolvedValue(config);
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'built-in',
+        name: 'Changed',
+        api: 'https://changed.example.com/api',
+        adult: false,
+        disabled: false,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: '该源不可编辑',
+    });
+    expect(setAdminConfig).not.toHaveBeenCalled();
+  });
+
+  test('returns 404 when the source key does not exist', async () => {
+    const config = createConfig();
+    mockGetConfig.mockResolvedValue(config);
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'missing',
+        name: 'Missing',
+        api: 'https://missing.example.com/api',
+        adult: false,
+        disabled: false,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: '源不存在' });
+    expect(setAdminConfig).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['name', '   ', 'https://example.com/api'],
+    ['api', 'Example', '   '],
+  ])('rejects a blank %s', async (_field, name, api) => {
+    const config = {
+      ...createConfig(),
+      SourceConfig: [
+        {
+          key: 'custom',
+          name: 'Custom',
+          api: 'https://custom.example.com/api',
+          adult: false,
+          from: 'custom' as const,
+          disabled: false,
+        },
+      ],
+    };
+    mockGetConfig.mockResolvedValue(config);
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'custom',
+        name,
+        api,
+        adult: false,
+        disabled: false,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: '缺少必要参数',
+    });
+    expect(setAdminConfig).not.toHaveBeenCalled();
+  });
+
+  test('normalizes non-boolean update metadata to false', async () => {
+    const config = {
+      ...createConfig(),
+      SourceConfig: [
+        {
+          key: 'custom',
+          name: 'Custom',
+          api: 'https://custom.example.com/api',
+          adult: true,
+          from: 'custom' as const,
+          disabled: true,
+        },
+      ],
+    };
+    mockGetConfig.mockResolvedValue(config);
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'custom',
+        name: 'Custom',
+        api: 'https://custom.example.com/api',
+        adult: 'true',
+        disabled: 1,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(config.SourceConfig[0]).toEqual(
+      expect.objectContaining({ adult: false, disabled: false })
+    );
+  });
+
+  test('allows an administrator to update a custom source', async () => {
+    mockAuth.mockReturnValue({ username: 'admin-user' } as never);
+    const config = {
+      ...createConfig(),
+      UserConfig: {
+        AllowRegister: false,
+        Users: [
+          {
+            username: 'admin-user',
+            role: 'admin' as const,
+            banned: false,
+          },
+        ],
+      },
+      SourceConfig: [
+        {
+          key: 'custom',
+          name: 'Custom',
+          api: 'https://custom.example.com/api',
+          adult: false,
+          from: 'custom' as const,
+          disabled: false,
+        },
+      ],
+    };
+    mockGetConfig.mockResolvedValue(config);
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'custom',
+        name: 'Updated by admin',
+        api: 'https://custom.example.com/api',
+        adult: false,
+        disabled: false,
+      }),
+    } as never;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(config.SourceConfig[0].name).toBe('Updated by admin');
+    expect(setAdminConfig).toHaveBeenCalledTimes(1);
+  });
+
+  test('rejects unauthenticated and non-admin users', async () => {
+    const request = {
+      json: async () => ({
+        action: 'update',
+        key: 'custom',
+        name: 'Updated',
+        api: 'https://custom.example.com/api',
+        adult: false,
+        disabled: false,
+      }),
+    } as never;
+
+    mockAuth.mockReturnValueOnce(null);
+    const unauthenticatedResponse = await POST(request);
+    expect(unauthenticatedResponse.status).toBe(401);
+
+    mockAuth.mockReturnValueOnce({ username: 'member' } as never);
+    mockGetConfig.mockResolvedValueOnce({
+      ...createConfig(),
+      UserConfig: {
+        AllowRegister: false,
+        Users: [{ username: 'member', role: 'user' as const, banned: false }],
+      },
+    });
+    const memberResponse = await POST(request);
+    expect(memberResponse.status).toBe(401);
+    expect(setAdminConfig).not.toHaveBeenCalled();
   });
 });

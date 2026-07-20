@@ -11,7 +11,7 @@ import { IStorage } from '@/lib/types';
 export const runtime = 'edge';
 
 // 支持的操作类型
-type Action = 'add' | 'disable' | 'enable' | 'delete' | 'sort';
+type Action = 'add' | 'update' | 'disable' | 'enable' | 'delete' | 'sort';
 
 interface BaseBody {
   action?: Action;
@@ -39,7 +39,14 @@ export async function POST(request: NextRequest) {
     const username = authInfo.username;
 
     // 基础校验
-    const ACTIONS: Action[] = ['add', 'disable', 'enable', 'delete', 'sort'];
+    const ACTIONS: Action[] = [
+      'add',
+      'update',
+      'disable',
+      'enable',
+      'delete',
+      'sort',
+    ];
     if (!username || !action || !ACTIONS.includes(action)) {
       return NextResponse.json({ error: '参数格式错误' }, { status: 400 });
     }
@@ -84,6 +91,46 @@ export async function POST(request: NextRequest) {
             disabled: false,
           })
         );
+        break;
+      }
+      case 'update': {
+        const { key, name, api, detail, adult, disabled } = body as {
+          key?: string;
+          name?: string;
+          api?: string;
+          detail?: string;
+          adult?: unknown;
+          disabled?: unknown;
+        };
+        if (
+          typeof key !== 'string' ||
+          typeof name !== 'string' ||
+          typeof api !== 'string' ||
+          !key.trim() ||
+          !name.trim() ||
+          !api.trim()
+        ) {
+          return NextResponse.json({ error: '缺少必要参数' }, { status: 400 });
+        }
+        const index = adminConfig.SourceConfig.findIndex(
+          (source) => source.key === key
+        );
+        if (index === -1) {
+          return NextResponse.json({ error: '源不存在' }, { status: 404 });
+        }
+        const current = adminConfig.SourceConfig[index];
+        if (current.from === 'config') {
+          return NextResponse.json({ error: '该源不可编辑' }, { status: 400 });
+        }
+        adminConfig.SourceConfig[index] = normalizeAdminSource({
+          key: current.key,
+          name,
+          api,
+          detail,
+          adult,
+          disabled,
+          from: current.from,
+        });
         break;
       }
       case 'disable': {
