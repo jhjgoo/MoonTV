@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getCacheTime, getConfig } from '@/lib/config';
+import { getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
 import {
   filterAccessibleSources,
@@ -15,14 +15,11 @@ export async function GET(request: Request) {
   const query = searchParams.get('q');
 
   if (!query) {
-    const cacheTime = await getCacheTime();
     return NextResponse.json(
       { results: [] },
       {
         headers: {
-          'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
-          'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
-          'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+          'Cache-Control': 'no-store',
         },
       }
     );
@@ -45,15 +42,11 @@ export async function GET(request: Request) {
         return !yellowWords.some((word: string) => typeName.includes(word));
       });
     }
-    const cacheTime = await getCacheTime();
-
     return NextResponse.json(
       { results: flattenedResults },
       {
         headers: {
-          'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
-          'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
-          'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+          'Cache-Control': 'no-store',
         },
       }
     );

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getCacheTime, getConfig } from '@/lib/config';
+import { getConfig } from '@/lib/config';
 import { searchFromApi } from '@/lib/downstream';
 import {
   ADULT_ACCESS_DENIED_MESSAGE,
@@ -18,14 +18,11 @@ export async function GET(request: Request) {
   const resourceId = searchParams.get('resourceId');
 
   if (!query || !resourceId) {
-    const cacheTime = await getCacheTime();
     return NextResponse.json(
       { result: null, error: '缺少必要参数: q 或 resourceId' },
       {
         headers: {
-          'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
-          'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
-          'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+          'Cache-Control': 'no-store',
         },
       }
     );
@@ -73,8 +70,6 @@ export async function GET(request: Request) {
         return !yellowWords.some((word: string) => typeName.includes(word));
       });
     }
-    const cacheTime = await getCacheTime();
-
     if (result.length === 0) {
       return NextResponse.json(
         {
@@ -88,9 +83,7 @@ export async function GET(request: Request) {
         { results: result },
         {
           headers: {
-            'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
-            'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
-            'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+            'Cache-Control': 'no-store',
           },
         }
       );

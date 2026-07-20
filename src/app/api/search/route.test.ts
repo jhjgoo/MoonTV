@@ -6,8 +6,12 @@ import { GET } from './route';
 
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: (body: unknown, init: { status?: number } = {}) => ({
+    json: (
+      body: unknown,
+      init: { status?: number; headers?: HeadersInit } = {}
+    ) => ({
       status: init.status || 200,
+      headers: init.headers,
       json: async () => body,
     }),
   },
@@ -50,6 +54,18 @@ describe('GET /api/search', () => {
     expect(mockSearch).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'safe' }),
       'test'
+    );
+  });
+
+  test('does not allow permission-filtered results to be shared from cache', async () => {
+    mockAdultAccess.mockResolvedValue(false);
+
+    const response = await GET({
+      url: 'https://moontv.test/api/search?q=test',
+    } as Request);
+
+    expect(response.headers).toEqual(
+      expect.objectContaining({ 'Cache-Control': 'no-store' })
     );
   });
 });

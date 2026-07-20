@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getCacheTime, getConfig } from '@/lib/config';
+import { getConfig } from '@/lib/config';
 import { getDetailFromApi } from '@/lib/downstream';
 import {
   ADULT_ACCESS_DENIED_MESSAGE,
@@ -51,13 +51,9 @@ export async function GET(request: Request) {
     }
 
     const result = await getDetailFromApi(apiSite, id);
-    const cacheTime = await getCacheTime();
-
     return NextResponse.json(result, {
       headers: {
-        'Cache-Control': `public, max-age=${cacheTime}, s-maxage=${cacheTime}`,
-        'CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
-        'Vercel-CDN-Cache-Control': `public, s-maxage=${cacheTime}`,
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {
