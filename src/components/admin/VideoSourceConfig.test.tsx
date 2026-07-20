@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 
 import type { AdminConfig } from '@/lib/admin.types';
@@ -109,6 +110,218 @@ describe('VideoSourceConfig', () => {
     fireEvent.click(screen.getByRole('button', { name: '添加订阅链接' }));
     expect(screen.queryByPlaceholderText('名称')).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('订阅链接')).toBeInTheDocument();
+  });
+
+  test('uses edit actions for custom sources and toggle actions for built-in sources', () => {
+    render(
+      <VideoSourceConfig
+        config={createConfig()}
+        refreshConfig={refreshConfig}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: '编辑 adult-source' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '禁用 adult-source' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: '编辑 general-source' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: '禁用 general-source' })
+    ).toBeInTheDocument();
+  });
+
+  test('opens a prefilled edit dialog with a read-only key', async () => {
+    render(
+      <VideoSourceConfig
+        config={createConfig()}
+        refreshConfig={refreshConfig}
+      />
+    );
+    const editButton = screen.getByRole('button', {
+      name: '编辑 adult-source',
+    });
+
+    fireEvent.click(editButton);
+
+    const dialog = screen.getByRole('dialog', { name: '编辑视频源' });
+    const dialogQueries = within(dialog);
+    const nameInput = dialogQueries.getByRole('textbox', { name: '名称' });
+    expect(nameInput).toHaveValue('Adult source');
+    expect(dialogQueries.getByRole('textbox', { name: 'Key' })).toHaveValue(
+      'adult-source'
+    );
+    expect(dialogQueries.getByRole('textbox', { name: 'Key' })).toHaveAttribute(
+      'readonly'
+    );
+    expect(
+      dialogQueries.getByRole('textbox', { name: 'API 地址' })
+    ).toHaveValue('https://adult.example.com/api');
+    expect(
+      dialogQueries.getByRole('textbox', { name: 'Detail 地址' })
+    ).toHaveValue('');
+    expect(
+      dialogQueries.getByRole('checkbox', { name: '🔞 成人内容源' })
+    ).toBeChecked();
+    expect(
+      dialogQueries.getByRole('checkbox', { name: '启用此视频源' })
+    ).toBeChecked();
+    await waitFor(() => expect(nameInput).toHaveFocus());
+
+    fireEvent.click(dialogQueries.getByRole('button', { name: '取消' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: '编辑 adult-source' })
+      ).toHaveFocus()
+    );
+  });
+
+  test('submits edited fields, prevents duplicates, and clears stale health state', async () => {
+    let resolveUpdate: (response: Response) => void = () => undefined;
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ healthy: true, latencyMs: 25, message: '接口响应正常' })
+      )
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveUpdate = resolve;
+        })
+      );
+    render(
+      <VideoSourceConfig
+        config={createConfig()}
+        refreshConfig={refreshConfig}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '检测' })[0]);
+    expect(await screen.findByText('正常 · 25 ms')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '编辑 adult-source' }));
+    const dialog = screen.getByRole('dialog', { name: '编辑视频源' });
+    const dialogQueries = within(dialog);
+    fireEvent.change(dialogQueries.getByRole('textbox', { name: '名称' }), {
+      target: { value: 'Updated source' },
+    });
+    fireEvent.change(dialogQueries.getByRole('textbox', { name: 'API 地址' }), {
+      target: { value: 'https://updated.example.com/api' },
+    });
+    fireEvent.change(
+      dialogQueries.getByRole('textbox', { name: 'Detail 地址' }),
+      {
+        target: { value: 'https://updated.example.com/detail' },
+      }
+    );
+    fireEvent.click(
+      dialogQueries.getByRole('checkbox', { name: '🔞 成人内容源' })
+    );
+    fireEvent.click(
+      dialogQueries.getByRole('checkbox', { name: '启用此视频源' })
+    );
+    fireEvent.click(dialogQueries.getByRole('button', { name: '保存修改' }));
+
+    expect(
+      dialogQueries.getByRole('button', { name: '保存中…' })
+    ).toBeDisabled();
+    expect(
+      dialogQueries.getByRole('button', { name: '关闭编辑视频源' })
+    ).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByTestId('edit-source-backdrop'));
+    expect(screen.getByRole('dialog', { name: '编辑视频源' })).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/admin/source',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'update',
+          key: 'adult-source',
+          name: 'Updated source',
+          api: 'https://updated.example.com/api',
+          detail: 'https://updated.example.com/detail',
+          adult: false,
+          disabled: true,
+        }),
+      })
+    );
+
+    await act(async () => {
+      resolveUpdate(jsonResponse({ ok: true }));
+    });
+
+    await waitFor(() => expect(refreshConfig).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getAllByText('未检测')).toHaveLength(2);
+  });
+
+  test('keeps edited input and health state when saving fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ healthy: true, latencyMs: 25, message: '接口响应正常' })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ error: '上游配置保存失败' }, false, 500)
+      );
+    render(
+      <VideoSourceConfig
+        config={createConfig()}
+        refreshConfig={refreshConfig}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: '检测' })[0]);
+    expect(await screen.findByText('正常 · 25 ms')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '编辑 adult-source' }));
+    const dialog = screen.getByRole('dialog', { name: '编辑视频源' });
+    const nameInput = within(dialog).getByRole('textbox', { name: '名称' });
+    fireEvent.change(nameInput, { target: { value: 'Unsaved source' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: '保存修改',
+        })
+      ).toBeEnabled()
+    );
+    expect(
+      within(screen.getByRole('dialog')).getByRole('textbox', {
+        name: '名称',
+      })
+    ).toHaveValue('Unsaved source');
+    expect(screen.getByText('正常 · 25 ms')).toBeInTheDocument();
+    expect(refreshConfig).not.toHaveBeenCalled();
+  });
+
+  test('closes the edit dialog with Escape, the close button, and the backdrop', () => {
+    render(
+      <VideoSourceConfig
+        config={createConfig()}
+        refreshConfig={refreshConfig}
+      />
+    );
+    const openDialog = () =>
+      fireEvent.click(
+        screen.getByRole('button', { name: '编辑 adult-source' })
+      );
+
+    openDialog();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    openDialog();
+    fireEvent.click(screen.getByRole('button', { name: '关闭编辑视频源' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    openDialog();
+    fireEvent.click(screen.getByTestId('edit-source-backdrop'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test('submits strict adult metadata when adding one source', async () => {

@@ -21,7 +21,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Swal from 'sweetalert2';
 
 import type { AdminConfig } from '@/lib/admin.types';
@@ -80,6 +80,12 @@ export default function VideoSourceConfig({
   const [checkStates, setCheckStates] = useState<Record<string, CheckState>>(
     {}
   );
+  const [editingSource, setEditingSource] = useState<AdminSource | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editTriggerKeyRef = useRef<string | null>(null);
+  const editButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const editNameRef = useRef<HTMLInputElement | null>(null);
+  const restoreEditFocusRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -95,6 +101,73 @@ export default function VideoSourceConfig({
       setCheckStates({});
     }
   }, [config]);
+
+  useEffect(() => {
+    if (editingSource) {
+      editNameRef.current?.focus();
+    } else if (restoreEditFocusRef.current) {
+      restoreEditFocusRef.current = false;
+      const triggerKey = editTriggerKeyRef.current;
+      window.setTimeout(() => {
+        if (triggerKey) {
+          editButtonRefs.current[triggerKey]?.focus();
+        }
+      }, 0);
+    }
+  }, [editingSource]);
+
+  useEffect(() => {
+    if (!editingSource || savingEdit) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        restoreEditFocusRef.current = true;
+        setEditingSource(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editingSource, savingEdit]);
+
+  const closeEditDialog = () => {
+    if (savingEdit) return;
+    restoreEditFocusRef.current = true;
+    setEditingSource(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (
+      !editingSource ||
+      savingEdit ||
+      !editingSource.name.trim() ||
+      !editingSource.api.trim()
+    ) {
+      return;
+    }
+    const key = editingSource.key;
+    setSavingEdit(true);
+    try {
+      await callSourceApi({
+        action: 'update',
+        key,
+        name: editingSource.name,
+        api: editingSource.api,
+        detail: editingSource.detail || '',
+        adult: editingSource.adult === true,
+        disabled: editingSource.disabled === true,
+      });
+      setCheckStates((current) => {
+        const next = { ...current };
+        delete next[key];
+        return next;
+      });
+      restoreEditFocusRef.current = true;
+      setEditingSource(null);
+    } catch {
+      // callSourceApi 已展示错误；保留表单供用户修正。
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const callSourceApi = async (body: Record<string, unknown>) => {
     try {
@@ -321,23 +394,40 @@ export default function VideoSourceConfig({
           >
             {checking ? '检测中…' : retrying ? '重新检测' : '检测'}
           </button>
-          <button
-            onClick={() => handleToggleEnable(source.key)}
-            className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              !source.disabled
-                ? 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60'
-                : 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60'
-            }`}
-          >
-            {!source.disabled ? '禁用' : '启用'}
-          </button>
-          {source.from !== 'config' && (
+          {source.from === 'config' ? (
             <button
-              onClick={() => handleDelete(source.key)}
-              className='inline-flex items-center rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-200 dark:bg-gray-700/40 dark:text-gray-200 dark:hover:bg-gray-700/60'
+              aria-label={`${!source.disabled ? '禁用' : '启用'} ${source.key}`}
+              onClick={() => handleToggleEnable(source.key)}
+              className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                !source.disabled
+                  ? 'bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60'
+                  : 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/60'
+              }`}
             >
-              删除
+              {!source.disabled ? '禁用' : '启用'}
             </button>
+          ) : (
+            <>
+              <button
+                ref={(node) => {
+                  editButtonRefs.current[source.key] = node;
+                }}
+                aria-label={`编辑 ${source.key}`}
+                onClick={() => {
+                  editTriggerKeyRef.current = source.key;
+                  setEditingSource({ ...source });
+                }}
+                className='inline-flex items-center rounded-full bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800 transition-colors hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-900/60'
+              >
+                编辑
+              </button>
+              <button
+                onClick={() => handleDelete(source.key)}
+                className='inline-flex items-center rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-200 dark:bg-gray-700/40 dark:text-gray-200 dark:hover:bg-gray-700/60'
+              >
+                删除
+              </button>
+            </>
           )}
         </td>
       </tr>
@@ -543,6 +633,152 @@ export default function VideoSourceConfig({
           >
             保存排序
           </button>
+        </div>
+      )}
+
+      {editingSource && (
+        <div
+          data-testid='edit-source-backdrop'
+          className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'
+          onClick={closeEditDialog}
+        >
+          <div
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='edit-source-title'
+            className='max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900'
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className='mb-5 flex items-center justify-between gap-4'>
+              <h3
+                id='edit-source-title'
+                className='text-lg font-semibold text-gray-900 dark:text-gray-100'
+              >
+                编辑视频源
+              </h3>
+              <button
+                type='button'
+                aria-label='关闭编辑视频源'
+                onClick={closeEditDialog}
+                disabled={savingEdit}
+                className='rounded-lg px-2 py-1 text-xl text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+              >
+                ×
+              </button>
+            </div>
+
+            <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+              <label className='space-y-1 text-sm text-gray-700 dark:text-gray-300'>
+                <span>名称</span>
+                <input
+                  ref={editNameRef}
+                  type='text'
+                  value={editingSource.name}
+                  onChange={(event) =>
+                    setEditingSource((current) =>
+                      current
+                        ? { ...current, name: event.target.value }
+                        : current
+                    )
+                  }
+                  className='w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+                />
+              </label>
+              <label className='space-y-1 text-sm text-gray-700 dark:text-gray-300'>
+                <span>Key</span>
+                <input
+                  type='text'
+                  value={editingSource.key}
+                  readOnly
+                  className='w-full cursor-not-allowed rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-gray-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                />
+              </label>
+              <label className='space-y-1 text-sm text-gray-700 dark:text-gray-300'>
+                <span>API 地址</span>
+                <input
+                  type='text'
+                  value={editingSource.api}
+                  onChange={(event) =>
+                    setEditingSource((current) =>
+                      current
+                        ? { ...current, api: event.target.value }
+                        : current
+                    )
+                  }
+                  className='w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+                />
+              </label>
+              <label className='space-y-1 text-sm text-gray-700 dark:text-gray-300'>
+                <span>Detail 地址</span>
+                <input
+                  type='text'
+                  value={editingSource.detail || ''}
+                  onChange={(event) =>
+                    setEditingSource((current) =>
+                      current
+                        ? { ...current, detail: event.target.value }
+                        : current
+                    )
+                  }
+                  className='w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100'
+                />
+              </label>
+            </div>
+
+            <div className='mt-5 space-y-3'>
+              <label className='flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300'>
+                <input
+                  type='checkbox'
+                  checked={editingSource.adult}
+                  onChange={(event) =>
+                    setEditingSource((current) =>
+                      current
+                        ? { ...current, adult: event.target.checked }
+                        : current
+                    )
+                  }
+                />
+                🔞 成人内容源
+              </label>
+              <label className='flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300'>
+                <input
+                  type='checkbox'
+                  checked={!editingSource.disabled}
+                  onChange={(event) =>
+                    setEditingSource((current) =>
+                      current
+                        ? { ...current, disabled: !event.target.checked }
+                        : current
+                    )
+                  }
+                />
+                启用此视频源
+              </label>
+            </div>
+
+            <div className='mt-6 flex justify-end gap-3'>
+              <button
+                type='button'
+                onClick={closeEditDialog}
+                disabled={savingEdit}
+                className='rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+              >
+                取消
+              </button>
+              <button
+                type='button'
+                onClick={handleSaveEdit}
+                disabled={
+                  savingEdit ||
+                  !editingSource.name.trim() ||
+                  !editingSource.api.trim()
+                }
+                className='rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400'
+              >
+                {savingEdit ? '保存中…' : '保存修改'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

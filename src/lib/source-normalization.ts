@@ -1,6 +1,9 @@
 import type { AdminSource, ConfigApiSite } from './source.types';
 
-type SourceInput = Omit<AdminSource, 'adult'> & { adult?: unknown };
+type SourceInput = Omit<AdminSource, 'adult' | 'disabled'> & {
+  adult?: unknown;
+  disabled?: unknown;
+};
 
 export function normalizeAdminSource(input: SourceInput): AdminSource {
   return {

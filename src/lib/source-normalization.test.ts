@@ -37,6 +37,22 @@ describe('source normalization', () => {
     ).toMatchObject({ adult: true, from: 'custom', disabled: true });
   });
 
+  test.each([undefined, false, 'true', 1, null, [], {}])(
+    'normalizes disabled %p to false',
+    (disabled) => {
+      expect(
+        normalizeAdminSource({
+          key: 'demo',
+          name: 'Demo',
+          api: 'https://example.com/api',
+          adult: false,
+          from: 'custom',
+          disabled,
+        })
+      ).toMatchObject({ disabled: false });
+    }
+  );
+
   test('creates config sources with a key and safe defaults', () => {
     expect(
       normalizeConfigSource('demo', {
