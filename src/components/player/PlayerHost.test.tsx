@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { createRef, forwardRef, useImperativeHandle } from 'react';
 
 import type {
+  PlayerEngine,
   PlayerEngineComponent,
   PlayerEngineProps,
   PlayerEnhancements,
@@ -12,6 +13,15 @@ import {
   PlayerHost,
   VIDSTACK_CAPABILITIES,
 } from './PlayerHost';
+
+jest.mock('./ArtPlayerEngine', () => ({
+  ArtPlayerEngine: forwardRef<PlayerHandle, PlayerEngineProps>(
+    function DefaultArtPlayerEngine(_props, ref) {
+      useImperativeHandle(ref, () => createFakeHandle(), []);
+      return <div data-testid='default-artplayer-engine' />;
+    }
+  ),
+}));
 
 function createFakeHandle(): PlayerHandle {
   return {
@@ -163,7 +173,7 @@ describe('PlayerHost', () => {
     );
   });
 
-  test('renders the safe ArtPlayer placeholder when no adapter is injected', async () => {
+  test('uses the ArtPlayer adapter by default when no adapter is injected', async () => {
     render(
       <PlayerHost
         media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
@@ -173,7 +183,9 @@ describe('PlayerHost', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('artplayer-engine')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('default-artplayer-engine')
+      ).toBeInTheDocument();
     });
     expect(screen.queryByTestId('vidstack-engine')).not.toBeInTheDocument();
   });

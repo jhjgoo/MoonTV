@@ -62,7 +62,7 @@ export interface PlayerEnhancements {
     config: PlayerSkipConfig;
     onChange: (config: PlayerSkipConfig) => void;
   };
-  onNextEpisode?: () => void;
+  onNextEpisode?: () => boolean | void;
 }
 
 export interface PlayerEngineProps {

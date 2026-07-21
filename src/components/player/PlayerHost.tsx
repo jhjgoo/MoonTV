@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 
+import { ArtPlayerEngine } from './ArtPlayerEngine';
 import type {
   PlayerCapabilities,
   PlayerEngine,
@@ -72,7 +73,7 @@ function createPlaceholderEngine(testId: string): PlayerEngineComponent {
 }
 
 const DEFAULT_ENGINES: Record<PlayerEngine, PlayerEngineComponent> = {
-  artplayer: createPlaceholderEngine('artplayer-engine'),
+  artplayer: ArtPlayerEngine,
   vidstack: createPlaceholderEngine('vidstack-engine'),
 };
 
