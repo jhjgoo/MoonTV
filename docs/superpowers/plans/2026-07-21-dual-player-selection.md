@@ -400,7 +400,7 @@ Expected: PASS for loading, local preference, URL override, invalid URL, and one
 
 Run: `rtk pnpm typecheck`
 
-Expected: PASS.
+Expected: player files have no type errors. The repository-wide command retains the Task 7 baseline of 17 pre-existing `AdultKeywords` fixture errors in five admin test files.
 
 ```bash
 rtk git add src/components/player/player.types.ts src/components/player/PlayerHost.tsx src/components/player/PlayerHost.test.tsx
@@ -565,7 +565,7 @@ Expected: PASS.
 
 Run: `rtk pnpm typecheck && rtk pnpm lint:strict`
 
-Expected: PASS with no new warnings.
+Expected: player files have no type or lint errors. The repository-wide commands retain the Task 7 baseline: 17 pre-existing `AdultKeywords` fixture errors in five admin test files and the `src/lib/config.ts` import-sort warning.
 
 Manually compare the constructor option object and ArtPlayer event names against the fixed pre-implementation commit `f27e936`; every removed option or event must appear unchanged in `ArtPlayerEngine.tsx` or have an explicit page-level equivalent.
 
@@ -661,7 +661,7 @@ Expected: PASS.
 
 Run: `rtk pnpm typecheck`
 
-Expected: PASS.
+Expected: player files have no type errors. The repository-wide command retains the Task 7 baseline of 17 pre-existing `AdultKeywords` fixture errors in five admin test files.
 
 ```bash
 rtk git add src/components/player/VidstackEngine.tsx src/components/player/VidstackEngine.test.tsx src/components/player/vidstack-player.css src/components/player/PlayerHost.tsx
@@ -727,7 +727,7 @@ Expected: PASS.
 
 Run: `rtk pnpm typecheck && rtk pnpm lint:strict`
 
-Expected: PASS.
+Expected: player files have no type or lint errors. The repository-wide commands retain the Task 7 baseline: 17 pre-existing `AdultKeywords` fixture errors in five admin test files and the `src/lib/config.ts` import-sort warning.
 
 ```bash
 rtk git add src/components/player/VidstackEngine.tsx src/components/player/VidstackEngine.test.tsx src/components/player/vidstack-player.css README.md
@@ -820,7 +820,7 @@ Expected: PASS.
 
 Run: `rtk pnpm typecheck && rtk pnpm lint:strict`
 
-Expected: PASS.
+Expected: player files have no type or lint errors. The repository-wide commands retain the Task 7 baseline: 17 pre-existing `AdultKeywords` fixture errors in five admin test files and the `src/lib/config.ts` import-sort warning.
 
 ```bash
 rtk git add src/components/player/PlayerHost.tsx src/components/player/PlayerHost.test.tsx src/components/player/VidstackEngine.tsx src/components/player/VidstackEngine.test.tsx src/app/play/page.tsx src/app/play/page.test.tsx
