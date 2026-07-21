@@ -10,6 +10,13 @@ import { createPortal } from 'react-dom';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 import { checkForUpdates, CURRENT_VERSION, UpdateStatus } from '@/lib/version';
 
+import type { PlayerEngine } from '@/components/player/player.types';
+import {
+  readPlayerPreference,
+  resetPlayerPreference,
+  writePlayerPreference,
+} from '@/components/player/player-preference';
+
 interface AuthInfo {
   username?: string;
   role?: 'owner' | 'admin' | 'user';
@@ -31,6 +38,8 @@ export const UserMenu: React.FC = () => {
   const [enableOptimization, setEnableOptimization] = useState(true);
   const [enableImageProxy, setEnableImageProxy] = useState(false);
   const [enableDoubanProxy, setEnableDoubanProxy] = useState(false);
+  const [playerPreference, setPlayerPreference] =
+    useState<PlayerEngine>('artplayer');
 
   // 修改密码相关状态
   const [newPassword, setNewPassword] = useState('');
@@ -62,6 +71,8 @@ export const UserMenu: React.FC = () => {
   // 从 localStorage 读取设置
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      setPlayerPreference(readPlayerPreference());
+
       const savedAggregateSearch = localStorage.getItem(
         'defaultAggregateSearch'
       );
@@ -260,6 +271,11 @@ export const UserMenu: React.FC = () => {
     }
   };
 
+  const handlePlayerPreferenceChange = (value: PlayerEngine) => {
+    setPlayerPreference(value);
+    writePlayerPreference(value);
+  };
+
   const handleResetSettings = () => {
     const defaultImageProxy = (window as any).RUNTIME_CONFIG?.IMAGE_PROXY || '';
     const defaultDoubanProxy =
@@ -271,6 +287,8 @@ export const UserMenu: React.FC = () => {
     setEnableDoubanProxy(!!defaultDoubanProxy);
     setEnableImageProxy(!!defaultImageProxy);
     setImageProxyUrl(defaultImageProxy);
+    setPlayerPreference('artplayer');
+    resetPlayerPreference();
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('defaultAggregateSearch', JSON.stringify(true));
@@ -512,6 +530,47 @@ export const UserMenu: React.FC = () => {
               </div>
             </label>
           </div>
+
+          <fieldset>
+            <legend className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+              默认播放器
+            </legend>
+            <div className='mt-3 space-y-3'>
+              <label className='flex items-start gap-3 cursor-pointer'>
+                <input
+                  type='radio'
+                  name='player-preference'
+                  value='artplayer'
+                  aria-label='ArtPlayer（默认）'
+                  checked={playerPreference === 'artplayer'}
+                  onChange={() => handlePlayerPreferenceChange('artplayer')}
+                  className='mt-0.5'
+                />
+                <span className='text-sm text-gray-700 dark:text-gray-300'>
+                  ArtPlayer（默认）
+                </span>
+              </label>
+              <label className='flex items-start gap-3 cursor-pointer'>
+                <input
+                  type='radio'
+                  name='player-preference'
+                  value='vidstack'
+                  aria-label='Vidstack（实验性）'
+                  checked={playerPreference === 'vidstack'}
+                  onChange={() => handlePlayerPreferenceChange('vidstack')}
+                  className='mt-0.5'
+                />
+                <span>
+                  <span className='block text-sm text-gray-700 dark:text-gray-300'>
+                    Vidstack（实验性）
+                  </span>
+                  <span className='block text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                    支持 AirPlay / Google Cast，部分播放增强功能暂不可用
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
 
           {/* 分割线 */}
           <div className='border-t border-gray-200 dark:border-gray-700'></div>
