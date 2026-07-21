@@ -43,6 +43,9 @@ interface MediaPlayerInstance {
   volume: number;
   playbackRate: number;
   paused: boolean;
+  remotePlaybackType?: string;
+  addEventListener(type: string, listener: EventListener): void;
+  removeEventListener(type: string, listener: EventListener): void;
   state?: { fullscreen?: boolean };
   play(): Promise<void>;
   pause(): Promise<void>;
@@ -50,18 +53,54 @@ interface MediaPlayerInstance {
   exitFullscreen(): Promise<void>;
 }
 
-const { MediaPlayer, MediaProvider } = require('@vidstack/react') as {
+interface VidstackControlProps {
+  'aria-label': string;
+  children: ReactNode;
+  className: string;
+}
+
+const {
+  MediaPlayer,
+  MediaProvider,
+  AirPlayButton,
+  GoogleCastButton,
+  AirPlayIcon,
+  ChromecastIcon,
+} = require('@vidstack/react') as {
   MediaPlayer: ForwardRefExoticComponent<
     PropsWithoutRef<VidstackMediaPlayerProps> &
       RefAttributes<MediaPlayerInstance>
   >;
   MediaProvider: ComponentType;
+  AirPlayButton: ComponentType<VidstackControlProps>;
+  GoogleCastButton: ComponentType<VidstackControlProps>;
+  AirPlayIcon: ComponentType<{ className: string }>;
+  ChromecastIcon: ComponentType<{ className: string }>;
 };
 const { DefaultVideoLayout, defaultLayoutIcons } =
   require('@vidstack/react/player/layouts/default') as {
-    DefaultVideoLayout: ComponentType<{ icons: unknown }>;
+    DefaultVideoLayout: ComponentType<{ icons: unknown; slots: unknown }>;
     defaultLayoutIcons: unknown;
   };
+
+const remotePlaybackControls = {
+  airPlayButton: (
+    <AirPlayButton
+      className='vds-airplay-button vds-button'
+      aria-label='AirPlay'
+    >
+      <AirPlayIcon className='vds-icon' />
+    </AirPlayButton>
+  ),
+  googleCastButton: (
+    <GoogleCastButton
+      className='vds-google-cast-button vds-button'
+      aria-label='Google Cast'
+    >
+      <ChromecastIcon className='vds-icon' />
+    </GoogleCastButton>
+  ),
+};
 
 const EMPTY_SNAPSHOT: PlayerSnapshot = {
   currentTime: 0,
@@ -146,6 +185,17 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
     };
 
     const handleError = (cause: unknown) => {
+      const remotePlaybackType = playerRef.current?.remotePlaybackType;
+      if (remotePlaybackType && remotePlaybackType !== 'none') {
+        propsRef.current.onFailure({
+          kind: 'remote-playback',
+          fatal: false,
+          message: '远程播放错误',
+          cause,
+        });
+        return;
+      }
+
       propsRef.current.onFailure({
         kind: 'playback',
         fatal: true,
@@ -154,10 +204,67 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
       });
     };
 
-    const setPlayerRef = useCallback((player: MediaPlayerInstance | null) => {
-      playerRef.current = player;
-      if (player) propsRef.current.onReady(handleRef.current);
+    const handleGoogleCastPromptError = useCallback((event: Event) => {
+      const cause =
+        event instanceof CustomEvent && event.detail !== undefined
+          ? event.detail
+          : event;
+      propsRef.current.onFailure({
+        kind: 'remote-playback',
+        fatal: false,
+        message: 'Google Cast 投屏失败',
+        cause,
+      });
     }, []);
+
+    const handleRemotePlaybackChange = useCallback((event: Event) => {
+      const detail = event instanceof CustomEvent ? event.detail : undefined;
+      if (
+        !detail ||
+        typeof detail !== 'object' ||
+        (detail as { state?: string }).state !== 'disconnected' ||
+        (detail as { type?: string }).type === 'none'
+      ) {
+        return;
+      }
+
+      propsRef.current.onFailure({
+        kind: 'remote-playback',
+        fatal: false,
+        message: '远程播放已断开',
+        cause: detail,
+      });
+    }, []);
+
+    const setPlayerRef = useCallback(
+      (player: MediaPlayerInstance | null) => {
+        const previousPlayer = playerRef.current;
+        if (previousPlayer === player) return;
+
+        previousPlayer?.removeEventListener(
+          'google-cast-prompt-error',
+          handleGoogleCastPromptError
+        );
+        previousPlayer?.removeEventListener(
+          'remote-playback-change',
+          handleRemotePlaybackChange
+        );
+        playerRef.current = player;
+
+        if (player) {
+          player.addEventListener(
+            'google-cast-prompt-error',
+            handleGoogleCastPromptError
+          );
+          player.addEventListener(
+            'remote-playback-change',
+            handleRemotePlaybackChange
+          );
+          propsRef.current.onReady(handleRef.current);
+        }
+      },
+      [handleGoogleCastPromptError, handleRemotePlaybackChange]
+    );
 
     return (
       <MediaPlayer
@@ -179,7 +286,10 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
         }
       >
         <MediaProvider />
-        <DefaultVideoLayout icons={defaultLayoutIcons} />
+        <DefaultVideoLayout
+          icons={defaultLayoutIcons}
+          slots={remotePlaybackControls}
+        />
       </MediaPlayer>
     );
   }

@@ -6,17 +6,32 @@ import { createRef, forwardRef, useEffect } from 'react';
 import type { PlayerHandle } from './player.types';
 import { VidstackEngine } from './VidstackEngine';
 
+const playerEventListeners = new Map<string, Set<EventListener>>();
 const player = {
   currentTime: 12,
   duration: 120,
   volume: 0.7,
   playbackRate: 1,
   paused: false,
+  remotePlaybackType: 'none',
   play: jest.fn(async () => undefined),
   pause: jest.fn(async () => undefined),
   enterFullscreen: jest.fn(async () => undefined),
   exitFullscreen: jest.fn(async () => undefined),
+  addEventListener: jest.fn((type: string, listener: EventListener) => {
+    const listeners =
+      playerEventListeners.get(type) ?? new Set<EventListener>();
+    listeners.add(listener);
+    playerEventListeners.set(type, listeners);
+  }),
+  removeEventListener: jest.fn((type: string, listener: EventListener) => {
+    playerEventListeners.get(type)?.delete(listener);
+  }),
 };
+
+function dispatchPlayerEvent(event: Event) {
+  playerEventListeners.get(event.type)?.forEach((listener) => listener(event));
+}
 let mediaPlayerProps: Record<string, any> = {};
 const providerUnmount = jest.fn();
 
@@ -37,12 +52,33 @@ jest.mock('@vidstack/react', () => ({
     useEffect(() => () => providerUnmount(), []);
     return <div data-testid='vidstack-media-provider' />;
   },
+  AirPlayButton: function MockAirPlayButton({ children, ...props }: any) {
+    return (
+      <button data-hidden='' type='button' {...props}>
+        {children}
+      </button>
+    );
+  },
+  GoogleCastButton: function MockGoogleCastButton({ children, ...props }: any) {
+    return (
+      <button data-hidden='' type='button' {...props}>
+        {children}
+      </button>
+    );
+  },
+  AirPlayIcon: () => <svg data-testid='airplay-icon' />,
+  ChromecastIcon: () => <svg data-testid='google-cast-icon' />,
 }));
 
 jest.mock(
   '@vidstack/react/player/layouts/default',
   () => ({
-    DefaultVideoLayout: () => <div data-testid='vidstack-default-layout' />,
+    DefaultVideoLayout: ({ slots }: any) => (
+      <div data-testid='vidstack-default-layout'>
+        {slots?.airPlayButton}
+        {slots?.googleCastButton}
+      </div>
+    ),
   }),
   { virtual: true }
 );
@@ -68,10 +104,14 @@ describe('VidstackEngine', () => {
     player.volume = 0.7;
     player.playbackRate = 1;
     player.paused = false;
+    player.remotePlaybackType = 'none';
     player.play.mockClear();
     player.pause.mockClear();
     player.enterFullscreen.mockClear();
     player.exitFullscreen.mockClear();
+    player.addEventListener.mockClear();
+    player.removeEventListener.mockClear();
+    playerEventListeners.clear();
     providerUnmount.mockClear();
     mediaPlayerProps = {};
   });
@@ -94,6 +134,21 @@ describe('VidstackEngine', () => {
     );
     expect(screen.getByTestId('vidstack-media-provider')).toBeInTheDocument();
     expect(screen.getByTestId('vidstack-default-layout')).toBeInTheDocument();
+  });
+
+  test('renders capability-gated AirPlay and Google Cast controls', () => {
+    render(<VidstackEngine {...defaultProps} />);
+
+    expect(screen.getByRole('button', { name: 'AirPlay' })).toHaveAttribute(
+      'data-hidden',
+      ''
+    );
+    expect(screen.getByRole('button', { name: 'Google Cast' })).toHaveAttribute(
+      'data-hidden',
+      ''
+    );
+    expect(screen.getByTestId('airplay-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('google-cast-icon')).toBeInTheDocument();
   });
 
   test('restores a snapshot once on canplay and maps generic media events', () => {
@@ -193,6 +248,97 @@ describe('VidstackEngine', () => {
 
     unmount();
     expect(providerUnmount).toHaveBeenCalledTimes(1);
+  });
+
+  test('reports Google Cast prompt errors as nonfatal remote playback failures', () => {
+    const onFailure = jest.fn();
+    render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
+    const cause = Object.assign(new Error('No receiver found'), {
+      code: 'NO_DEVICES_AVAILABLE',
+    });
+
+    act(() => {
+      dispatchPlayerEvent(
+        new CustomEvent('google-cast-prompt-error', { detail: cause })
+      );
+    });
+
+    expect(onFailure).toHaveBeenCalledWith({
+      kind: 'remote-playback',
+      fatal: false,
+      message: 'Google Cast 投屏失败',
+      cause,
+    });
+  });
+
+  test('reports generic errors during active remote playback without unmounting', () => {
+    const onFailure = jest.fn();
+    render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
+    player.remotePlaybackType = 'google-cast';
+    const cause = new Error('receiver load failed');
+
+    act(() => mediaPlayerProps.onError(cause));
+
+    expect(onFailure).toHaveBeenCalledWith({
+      kind: 'remote-playback',
+      fatal: false,
+      message: '远程播放错误',
+      cause,
+    });
+    expect(screen.getByTestId('vidstack-media-player')).toBeInTheDocument();
+    expect(providerUnmount).not.toHaveBeenCalled();
+  });
+
+  test('reports remote disconnects without escalating them to fatal local failures', () => {
+    const onFailure = jest.fn();
+    render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
+    const detail = { type: 'airplay', state: 'disconnected' };
+
+    act(() => {
+      dispatchPlayerEvent(
+        new CustomEvent('remote-playback-change', { detail })
+      );
+    });
+
+    expect(onFailure).toHaveBeenCalledWith({
+      kind: 'remote-playback',
+      fatal: false,
+      message: '远程播放已断开',
+      cause: detail,
+    });
+    expect(screen.getByTestId('vidstack-media-player')).toBeInTheDocument();
+  });
+
+  test('keeps remote playback listeners singular across rerenders and cleans them up', () => {
+    const initialFailure = jest.fn();
+    const currentFailure = jest.fn();
+    const view = render(
+      <VidstackEngine {...defaultProps} onFailure={initialFailure} />
+    );
+
+    view.rerender(
+      <VidstackEngine {...defaultProps} onFailure={currentFailure} />
+    );
+    const cause = new Error('Cast canceled');
+    act(() => {
+      dispatchPlayerEvent(
+        new CustomEvent('google-cast-prompt-error', { detail: cause })
+      );
+    });
+
+    expect(initialFailure).not.toHaveBeenCalled();
+    expect(currentFailure).toHaveBeenCalledTimes(1);
+    expect(player.addEventListener).toHaveBeenCalledTimes(2);
+
+    view.unmount();
+    expect(player.removeEventListener).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      dispatchPlayerEvent(
+        new CustomEvent('google-cast-prompt-error', { detail: cause })
+      );
+    });
+    expect(currentFailure).toHaveBeenCalledTimes(1);
   });
 
   test('does not announce ready again and clear a fatal error after rerender', () => {
