@@ -21,6 +21,7 @@ import type {
   PlayerSnapshot,
 } from './player.types';
 import { resolvePlayerPreference } from './player-preference';
+import { VidstackEngine } from './VidstackEngine';
 
 const noopReady: PlayerEngineProps['onReady'] = () => undefined;
 const noopCanPlay: NonNullable<PlayerEngineProps['onCanPlay']> = () =>
@@ -37,16 +38,6 @@ const EMPTY_SNAPSHOT: PlayerSnapshot = {
   playbackRate: 1,
   paused: true,
 };
-const EMPTY_HANDLE: PlayerHandle = {
-  getSnapshot: () => EMPTY_SNAPSHOT,
-  pause: () => undefined,
-  play: async () => undefined,
-  seek: () => undefined,
-  setPlaybackRate: () => undefined,
-  setVolume: () => undefined,
-  toggleFullscreen: () => undefined,
-};
-
 export const ARTPLAYER_CAPABILITIES = Object.freeze({
   airPlay: true,
   googleCast: false,
@@ -63,20 +54,9 @@ export const VIDSTACK_CAPABILITIES = Object.freeze({
   mobileGestures: false,
 });
 
-function createPlaceholderEngine(testId: string): PlayerEngineComponent {
-  return forwardRef<PlayerHandle, PlayerEngineProps>(function PlaceholderEngine(
-    _props,
-    ref
-  ) {
-    useImperativeHandle(ref, () => EMPTY_HANDLE, []);
-
-    return <div data-testid={testId} />;
-  });
-}
-
 const DEFAULT_ENGINES: Record<PlayerEngine, PlayerEngineComponent> = {
   artplayer: ArtPlayerEngine,
-  vidstack: createPlaceholderEngine('vidstack-engine'),
+  vidstack: VidstackEngine,
 };
 
 function capabilitiesFor(engine: PlayerEngine): PlayerCapabilities {

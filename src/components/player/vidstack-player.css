@@ -1,0 +1,15 @@
+@import '@vidstack/react/player/styles/base.css';
+@import '@vidstack/react/player/styles/default/theme.css';
+@import '@vidstack/react/player/styles/default/layouts/video.css';
+
+.vidstack-player {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.vidstack-player [data-media-provider] {
+  height: 100%;
+  width: 100%;
+}

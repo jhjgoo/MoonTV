@@ -23,6 +23,15 @@ jest.mock('./ArtPlayerEngine', () => ({
   ),
 }));
 
+jest.mock('./VidstackEngine', () => ({
+  VidstackEngine: forwardRef<PlayerHandle, PlayerEngineProps>(
+    function DefaultVidstackEngine(_props, ref) {
+      useImperativeHandle(ref, () => createFakeHandle(), []);
+      return <div data-testid='default-vidstack-engine' />;
+    }
+  ),
+}));
+
 function createFakeHandle(): PlayerHandle {
   return {
     getSnapshot: () => ({
@@ -188,6 +197,23 @@ describe('PlayerHost', () => {
       ).toBeInTheDocument();
     });
     expect(screen.queryByTestId('vidstack-engine')).not.toBeInTheDocument();
+  });
+
+  test('uses the Vidstack adapter by default when the resolved preference is Vidstack', async () => {
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride='vidstack'
+        resolvePreference={() => 'vidstack'}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('default-vidstack-engine')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId('default-artplayer-engine')
+    ).not.toBeInTheDocument();
   });
 
   test('forwards imperative controls to the selected engine', async () => {
