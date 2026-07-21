@@ -505,7 +505,7 @@ describe('PlayerHost', () => {
     );
     localStorage.setItem('preferredPlayer', 'vidstack');
 
-    render(
+    const view = render(
       <PlayerHost
         media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
         urlOverride={null}
@@ -549,6 +549,22 @@ describe('PlayerHost', () => {
     );
     expect(onSwitchingChange).toHaveBeenNthCalledWith(2, false);
 
+    act(() => artplayerProps.mock.calls.at(-1)?.[0].onCanPlay(snapshot));
+    view.rerender(
+      <PlayerHost
+        media={{ url: 'https://example.com/next.m3u8', title: 'Episode 2' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer, vidstack: Vidstack }}
+        resolvePreference={() => 'vidstack'}
+        onEngineChange={onEngineChange}
+        onSwitchingChange={onSwitchingChange}
+      />
+    );
+    expect(artplayerProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ restoreSnapshot: undefined })
+    );
+    const artplayerRenderCount = artplayerProps.mock.calls.length;
+
     act(() => {
       vidstackProps.mock.calls.at(-1)?.[0].onFailure({
         kind: 'playback',
@@ -557,7 +573,7 @@ describe('PlayerHost', () => {
       });
     });
 
-    expect(artplayerProps).toHaveBeenCalledTimes(1);
+    expect(artplayerProps).toHaveBeenCalledTimes(artplayerRenderCount);
     expect(onEngineChange).toHaveBeenCalledTimes(2);
   });
 

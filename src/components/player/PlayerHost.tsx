@@ -23,8 +23,6 @@ import type {
 import { resolvePlayerPreference } from './player-preference';
 import { VidstackEngine } from './VidstackEngine';
 
-const noopCanPlay: NonNullable<PlayerEngineProps['onCanPlay']> = () =>
-  undefined;
 const noopTimeUpdate: PlayerEngineProps['onTimeUpdate'] = () => undefined;
 const noopEnded: PlayerEngineProps['onEnded'] = () => undefined;
 const noopPlay: PlayerEngineProps['onPlay'] = () => undefined;
@@ -109,6 +107,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
   ) {
     const [engine, setEngine] = useState<PlayerEngine | null>(null);
     const [fallbackSnapshot, setFallbackSnapshot] = useState<PlayerSnapshot>();
+    const [fallbackMediaUrl, setFallbackMediaUrl] = useState<string>();
     const [showFallbackNotice, setShowFallbackNotice] = useState(false);
     const engineRef = useRef<PlayerHandle>(null);
     const fallbackOccurredRef = useRef(false);
@@ -171,6 +170,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
         const snapshot = engineRef.current?.getSnapshot() ?? EMPTY_SNAPSHOT;
         onSwitchingChange?.(true);
         setFallbackSnapshot(snapshot);
+        setFallbackMediaUrl(media.url);
         setShowFallbackNotice(true);
         setEngine('artplayer');
         onEngineChange?.('artplayer', ARTPLAYER_CAPABILITIES);
@@ -183,6 +183,19 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
       onReady?.(handle);
       if (engine === 'artplayer' && fallbackOccurredRef.current) {
         onSwitchingChange?.(false);
+      }
+    };
+    const handleCanPlay: NonNullable<PlayerEngineProps['onCanPlay']> = (
+      snapshot
+    ) => {
+      onCanPlay?.(snapshot);
+      if (
+        engine === 'artplayer' &&
+        fallbackSnapshot &&
+        fallbackMediaUrl === media.url
+      ) {
+        setFallbackSnapshot(undefined);
+        setFallbackMediaUrl(undefined);
       }
     };
 
@@ -198,12 +211,21 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
           enhancements={enhancements}
           media={media}
           restoreSnapshot={
-            engine === 'artplayer' && fallbackSnapshot
+            engine === 'artplayer' &&
+            fallbackSnapshot &&
+            fallbackMediaUrl === media.url
               ? fallbackSnapshot
               : restoreSnapshot
           }
+          restoreSnapshotKind={
+            engine === 'artplayer' &&
+            fallbackSnapshot &&
+            fallbackMediaUrl === media.url
+              ? 'fallback'
+              : 'resume'
+          }
           onEnded={onEnded ?? noopEnded}
-          onCanPlay={onCanPlay ?? noopCanPlay}
+          onCanPlay={handleCanPlay}
           onFailure={handleFailure}
           onPause={onPause ?? noopPause}
           onPlay={onPlay ?? noopPlay}

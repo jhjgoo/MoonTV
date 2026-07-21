@@ -284,12 +284,13 @@ describe('ArtPlayerEngine', () => {
       <ArtPlayerEngine
         media={{ url: 'https://example.com/episode.m3u8', title: '第一集' }}
         restoreSnapshot={{
-          currentTime: 48,
+          currentTime: 119,
           duration: 120,
           volume: 0.35,
           playbackRate: 1.5,
           paused: true,
         }}
+        restoreSnapshotKind='fallback'
         onReady={jest.fn()}
         onTimeUpdate={jest.fn()}
         onEnded={jest.fn()}
@@ -303,7 +304,7 @@ describe('ArtPlayerEngine', () => {
     act(() => player.emit('video:canplay'));
 
     expect(player).toMatchObject({
-      currentTime: 48,
+      currentTime: 119,
       volume: 0.35,
       playbackRate: 1.5,
       paused: true,

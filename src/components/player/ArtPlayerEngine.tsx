@@ -368,7 +368,11 @@ export const ArtPlayerEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
                   : undefined);
           if (restore) {
             let time = restore.currentTime;
-            if (engine.duration && time >= engine.duration - 2) {
+            if (
+              propsRef.current.restoreSnapshotKind !== 'fallback' &&
+              engine.duration &&
+              time >= engine.duration - 2
+            ) {
               time = Math.max(0, engine.duration - 5);
             }
             if (time > 0) engine.currentTime = time;

@@ -68,6 +68,7 @@ export interface PlayerEnhancements {
 export interface PlayerEngineProps {
   media: PlayerMedia;
   restoreSnapshot?: PlayerSnapshot;
+  restoreSnapshotKind?: 'fallback' | 'resume';
   enhancements?: PlayerEnhancements;
   onReady: (handle: PlayerHandle) => void;
   onCanPlay?: (snapshot: PlayerSnapshot) => void;
