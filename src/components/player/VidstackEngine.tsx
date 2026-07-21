@@ -123,6 +123,12 @@ function snapshotFor(player: MediaPlayerInstance | null): PlayerSnapshot {
   };
 }
 
+function eventDetail(event: Event): unknown {
+  return 'detail' in event
+    ? (event as Event & { detail?: unknown }).detail
+    : undefined;
+}
+
 export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
   function VidstackEngine(props, ref) {
     const playerRef = useRef<MediaPlayerInstance | null>(null);
@@ -211,10 +217,8 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
     };
 
     const handleGoogleCastPromptError = useCallback((event: Event) => {
-      const cause =
-        event instanceof CustomEvent && event.detail !== undefined
-          ? event.detail
-          : event;
+      const detail = eventDetail(event);
+      const cause = detail !== undefined ? detail : event;
       propsRef.current.onFailure({
         kind: 'remote-playback',
         fatal: false,
@@ -224,7 +228,7 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
     }, []);
 
     const handleRemotePlaybackChange = useCallback((event: Event) => {
-      const detail = event instanceof CustomEvent ? event.detail : undefined;
+      const detail = eventDetail(event);
       if (
         !detail ||
         typeof detail !== 'object' ||

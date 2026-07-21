@@ -33,6 +33,10 @@ const player = {
 function dispatchPlayerEvent(event: Event) {
   playerEventListeners.get(event.type)?.forEach((listener) => listener(event));
 }
+
+function createPlayerEvent(type: string, detail: unknown): Event {
+  return Object.assign(new Event(type), { detail });
+}
 let mediaPlayerProps: Record<string, any> = {};
 const providerUnmount = jest.fn();
 
@@ -260,9 +264,7 @@ describe('VidstackEngine', () => {
     });
 
     act(() => {
-      dispatchPlayerEvent(
-        new CustomEvent('google-cast-prompt-error', { detail: cause })
-      );
+      dispatchPlayerEvent(createPlayerEvent('google-cast-prompt-error', cause));
     });
 
     expect(onFailure).toHaveBeenCalledWith({
@@ -315,9 +317,7 @@ describe('VidstackEngine', () => {
     const detail = { type: 'airplay', state: 'disconnected' };
 
     act(() => {
-      dispatchPlayerEvent(
-        new CustomEvent('remote-playback-change', { detail })
-      );
+      dispatchPlayerEvent(createPlayerEvent('remote-playback-change', detail));
     });
 
     expect(onFailure).toHaveBeenCalledWith({
