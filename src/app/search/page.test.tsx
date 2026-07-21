@@ -39,11 +39,14 @@ jest.mock('@/components/PageLayout', () => ({
 jest.mock('@/components/VideoCard', () => ({
   __esModule: true,
   default: ({ title, items }: { title?: string; items?: SearchResult[] }) => (
-    <div>{title || items?.[0]?.title}</div>
+    <div data-testid='video-card'>{title || items?.[0]?.title}</div>
   ),
 }));
 
-function searchResult(id: string): SearchResult {
+function searchResult(
+  id: string,
+  overrides: Partial<SearchResult> = {}
+): SearchResult {
   return {
     id,
     title: `第一批结果 ${id}`,
@@ -52,6 +55,7 @@ function searchResult(id: string): SearchResult {
     source: 'safe',
     source_name: '安全源',
     year: '2026',
+    ...overrides,
   };
 }
 
@@ -117,6 +121,51 @@ describe('SearchPage progressive loading', () => {
     });
 
     await waitFor(() => expect(loadNext).toHaveBeenCalledWith('auto'));
+  });
+
+  test('waits for a fresh sentinel observation after results change', async () => {
+    const view = render(<SearchPage />);
+    await waitFor(() => expect(intersectionCallback).toBeDefined());
+
+    act(() => {
+      intersectionCallback?.(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver
+      );
+    });
+    await waitFor(() => expect(loadNext).toHaveBeenCalledTimes(1));
+
+    loadNext.mockClear();
+    mockUseProgressiveSearch.mockReturnValue(
+      state({
+        results: [searchResult('1'), searchResult('2')],
+        nextPage: 2,
+        totalPages: 3,
+      })
+    );
+    view.rerender(<SearchPage />);
+    await act(async () => undefined);
+
+    expect(loadNext).not.toHaveBeenCalled();
+  });
+
+  test('preserves progressive result order in aggregate view', async () => {
+    mockUseProgressiveSearch.mockReturnValue(
+      state({
+        results: [
+          searchResult('older', { title: '较早结果', year: '2020' }),
+          searchResult('newer', { title: '较新结果', year: '2026' }),
+        ],
+      })
+    );
+
+    render(<SearchPage />);
+
+    expect(
+      (await screen.findAllByTestId('video-card')).map(
+        (card) => card.textContent
+      )
+    ).toEqual(['较早结果', '较新结果']);
   });
 
   test('shows the final empty state only after all batches are exhausted', async () => {

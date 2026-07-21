@@ -41,7 +41,9 @@ export default function SearchLoadFooter({
         </button>
       )}
 
-      {isExhausted && hasResults && <span>已加载全部结果</span>}
+      {isExhausted && hasResults && failedCount === 0 && (
+        <span>已加载全部结果</span>
+      )}
 
       {failedCount > 0 && (
         <div className='flex items-center gap-3'>

@@ -42,6 +42,7 @@ describe('SearchLoadFooter', () => {
     );
 
     expect(screen.getByText('部分视频源加载失败')).toBeInTheDocument();
+    expect(screen.queryByText('已加载全部结果')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '重试失败批次' }));
     expect(onRetryFailed).toHaveBeenCalledTimes(1);
   });

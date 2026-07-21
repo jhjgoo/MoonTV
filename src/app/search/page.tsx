@@ -34,7 +34,11 @@ function SearchPageClient() {
   const [searchQuery, setSearchQuery] = useState('');
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const hasFilledViewportRef = useRef(false);
-  const [sentinelVisible, setSentinelVisible] = useState(false);
+  const [sentinelObservation, setSentinelObservation] = useState({
+    query: '',
+    resultCount: -1,
+    visible: false,
+  });
   const [observerSupported, setObserverSupported] = useState(() =>
     typeof window !== 'undefined' ? 'IntersectionObserver' in window : false
   );
@@ -66,39 +70,8 @@ function SearchPageClient() {
       arr.push(item);
       map.set(key, arr);
     });
-    return Array.from(map.entries()).sort((a, b) => {
-      // 优先排序：标题与搜索词完全一致的排在前面
-      const aExactMatch = a[1][0].title
-        .replaceAll(' ', '')
-        .includes(searchQuery.trim().replaceAll(' ', ''));
-      const bExactMatch = b[1][0].title
-        .replaceAll(' ', '')
-        .includes(searchQuery.trim().replaceAll(' ', ''));
-
-      if (aExactMatch && !bExactMatch) return -1;
-      if (!aExactMatch && bExactMatch) return 1;
-
-      // 年份排序
-      if (a[1][0].year === b[1][0].year) {
-        return a[0].localeCompare(b[0]);
-      } else {
-        // 处理 unknown 的情况
-        const aYear = a[1][0].year;
-        const bYear = b[1][0].year;
-
-        if (aYear === 'unknown' && bYear === 'unknown') {
-          return 0;
-        } else if (aYear === 'unknown') {
-          return 1; // a 排在后面
-        } else if (bYear === 'unknown') {
-          return -1; // b 排在后面
-        } else {
-          // 都是数字年份，按数字大小排序（大的在前面）
-          return aYear > bYear ? -1 : 1;
-        }
-      }
-    });
-  }, [searchQuery, searchResults]);
+    return Array.from(map.entries());
+  }, [searchResults]);
 
   useEffect(() => {
     // 无搜索参数时聚焦搜索框
@@ -165,7 +138,6 @@ function SearchPageClient() {
 
   useEffect(() => {
     hasFilledViewportRef.current = false;
-    setSentinelVisible(false);
   }, [activeQuery]);
 
   useEffect(() => {
@@ -176,7 +148,11 @@ function SearchPageClient() {
 
     const observer = new window.IntersectionObserver(
       ([entry]) => {
-        setSentinelVisible(entry.isIntersecting);
+        setSentinelObservation({
+          query: activeQuery,
+          resultCount: searchResults.length,
+          visible: entry.isIntersecting,
+        });
         if (!entry.isIntersecting && searchResults.length > 0) {
           hasFilledViewportRef.current = true;
         }
@@ -194,6 +170,10 @@ function SearchPageClient() {
     progressiveSearch.status === 'initial-loading' ||
     progressiveSearch.status === 'auto-filling' ||
     progressiveSearch.status === 'loading-more';
+  const sentinelVisible =
+    sentinelObservation.query === activeQuery &&
+    sentinelObservation.resultCount === searchResults.length &&
+    sentinelObservation.visible;
 
   useEffect(() => {
     if (!sentinelVisible || !progressiveSearch.hasMore || isBatchLoading) {

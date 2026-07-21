@@ -152,6 +152,68 @@ describe('useProgressiveSearch', () => {
     expect(hook.current.failedPages).toEqual([]);
   });
 
+  test('continues probing later batches after the initial batch fails twice', async () => {
+    const fetchBatch = jest.fn(async (_query: string, page: number) => {
+      if (page === 0) throw new Error('initial batch failed');
+      return { results: [result('later')], totalPages: 2 };
+    });
+    const { result: hook } = renderHook(() =>
+      useProgressiveSearch('测试', fetchBatch)
+    );
+
+    await waitFor(() => expect(hook.current.failedPages).toEqual([0]));
+    expect(hook.current.hasMore).toBe(true);
+
+    await act(async () => {
+      await hook.current.loadNext('auto');
+    });
+
+    expect(fetchBatch.mock.calls.map((call) => call[1])).toEqual([0, 0, 1]);
+    expect(hook.current.results.map((item) => item.id)).toEqual(['later']);
+    expect(hook.current.status).toBe('exhausted');
+  });
+
+  test('does not restart the query when the fetcher identity changes', async () => {
+    const firstFetcher = jest
+      .fn()
+      .mockResolvedValue({ results: [result('first')], totalPages: 1 });
+    const secondFetcher = jest
+      .fn()
+      .mockResolvedValue({ results: [result('second')], totalPages: 1 });
+    const { result: hook, rerender } = renderHook(
+      ({ fetcher }) => useProgressiveSearch('测试', fetcher),
+      { initialProps: { fetcher: firstFetcher } }
+    );
+
+    await waitFor(() => expect(hook.current.status).toBe('exhausted'));
+    rerender({ fetcher: secondFetcher });
+    await act(async () => undefined);
+
+    expect(firstFetcher).toHaveBeenCalledTimes(1);
+    expect(secondFetcher).not.toHaveBeenCalled();
+    expect(hook.current.results.map((item) => item.id)).toEqual(['first']);
+  });
+
+  test('hides old results synchronously when the query changes', async () => {
+    const nextQuery = deferred<SearchBatchResponse>();
+    const fetchBatch = jest.fn((query: string) => {
+      if (query === '旧查询') {
+        return Promise.resolve({ results: [result('old')], totalPages: 1 });
+      }
+      return nextQuery.promise;
+    });
+    const { result: hook, rerender } = renderHook(
+      ({ query }) => useProgressiveSearch(query, fetchBatch),
+      { initialProps: { query: '旧查询' } }
+    );
+
+    await waitFor(() => expect(hook.current.results).toHaveLength(1));
+    rerender({ query: '新查询' });
+
+    expect(hook.current.results).toEqual([]);
+    expect(hook.current.status).toBe('initial-loading');
+  });
+
   test('skips a twice-failed page and retries it separately later', async () => {
     let pageOneAttempts = 0;
     let allowPageOne = false;

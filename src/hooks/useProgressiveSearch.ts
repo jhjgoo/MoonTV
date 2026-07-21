@@ -77,13 +77,16 @@ export function useProgressiveSearch(
   const [nextPage, setNextPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [failedPages, setFailedPages] = useState<number[]>([]);
+  const [stateQuery, setStateQuery] = useState(query);
   const [restartToken, setRestartToken] = useState(0);
+  const fetchBatchRef = useRef(fetchBatch);
   const controllerRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
   const inFlightRef = useRef(false);
   const nextPageRef = useRef(0);
   const totalPagesRef = useRef(1);
   const failedPagesRef = useRef<number[]>([]);
+  fetchBatchRef.current = fetchBatch;
 
   const updateFailedPages = useCallback((pages: number[]) => {
     const normalized = Array.from(new Set(pages)).sort((a, b) => a - b);
@@ -96,7 +99,7 @@ export function useProgressiveSearch(
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt += 1) {
         try {
-          return await fetchBatch(pageQuery, page, signal);
+          return await fetchBatchRef.current(pageQuery, page, signal);
         } catch (error) {
           if (signal.aborted) throw error;
           lastError = error;
@@ -104,7 +107,7 @@ export function useProgressiveSearch(
       }
       throw lastError;
     },
-    [fetchBatch]
+    []
   );
 
   const updatePagination = useCallback((next: number, total: number) => {
@@ -118,6 +121,7 @@ export function useProgressiveSearch(
     controllerRef.current?.abort();
     generationRef.current += 1;
     const generation = generationRef.current;
+    setStateQuery(query);
     setResults([]);
     updateFailedPages([]);
     updatePagination(0, 1);
@@ -145,8 +149,10 @@ export function useProgressiveSearch(
           !controller.signal.aborted
         ) {
           updateFailedPages([0]);
-          updatePagination(1, 1);
-          setStatus('exhausted');
+          // The failed first batch cannot tell us the real page count. Probe
+          // page 1 so one unavailable source group does not block all others.
+          updatePagination(1, 2);
+          setStatus('ready');
         }
       })
       .finally(() => {
@@ -245,27 +251,35 @@ export function useProgressiveSearch(
     setRestartToken((token) => token + 1);
   }, []);
 
-  return useMemo(
-    () => ({
-      results,
-      status,
-      nextPage,
-      totalPages,
-      hasMore: nextPage < totalPages,
-      failedPages,
+  return useMemo(() => {
+    const matchesCurrentQuery = stateQuery === query;
+    const visibleNextPage = matchesCurrentQuery ? nextPage : 0;
+    const visibleTotalPages = matchesCurrentQuery ? totalPages : 1;
+    return {
+      results: matchesCurrentQuery ? results : [],
+      status: matchesCurrentQuery
+        ? status
+        : query.trim()
+        ? 'initial-loading'
+        : 'idle',
+      nextPage: visibleNextPage,
+      totalPages: visibleTotalPages,
+      hasMore: visibleNextPage < visibleTotalPages,
+      failedPages: matchesCurrentQuery ? failedPages : [],
       loadNext,
       retryFailed,
       restart,
-    }),
-    [
-      failedPages,
-      loadNext,
-      nextPage,
-      restart,
-      retryFailed,
-      results,
-      status,
-      totalPages,
-    ]
-  );
+    };
+  }, [
+    failedPages,
+    loadNext,
+    nextPage,
+    query,
+    restart,
+    retryFailed,
+    results,
+    stateQuery,
+    status,
+    totalPages,
+  ]);
 }
