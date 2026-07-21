@@ -70,6 +70,7 @@ export interface PlayerEngineProps {
   restoreSnapshot?: PlayerSnapshot;
   enhancements?: PlayerEnhancements;
   onReady: (handle: PlayerHandle) => void;
+  onCanPlay?: (snapshot: PlayerSnapshot) => void;
   onTimeUpdate: (snapshot: PlayerSnapshot) => void;
   onEnded: () => void;
   onPlay: (snapshot: PlayerSnapshot) => void;

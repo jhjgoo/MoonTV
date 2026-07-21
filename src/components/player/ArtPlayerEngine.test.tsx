@@ -197,6 +197,35 @@ describe('ArtPlayerEngine', () => {
     expect(first.destroy).not.toHaveBeenCalled();
   });
 
+  test('reports canplay after a non-WebKit switch without waiting for a new ready event', () => {
+    const onCanPlay = jest.fn();
+    const props = {
+      media: { url: 'https://example.com/one.m3u8', title: '第一集' },
+      onReady: jest.fn(),
+      onCanPlay,
+      onTimeUpdate: jest.fn(),
+      onEnded: jest.fn(),
+      onPlay: jest.fn(),
+      onPause: jest.fn(),
+      onFailure: jest.fn(),
+    };
+    const view = render(<ArtPlayerEngine {...props} />);
+    const player = mockArtInstances[0];
+
+    view.rerender(
+      <ArtPlayerEngine
+        {...props}
+        media={{ url: 'https://example.com/two.m3u8', title: '第二集' }}
+      />
+    );
+    act(() => player.emit('video:canplay'));
+
+    expect(props.onReady).not.toHaveBeenCalled();
+    expect(onCanPlay).toHaveBeenCalledWith(
+      expect.objectContaining({ currentTime: 12, duration: 120 })
+    );
+  });
+
   test('rebuilds and tears down ArtPlayer when WebKit changes media', () => {
     Object.defineProperty(window, 'webkitConvertPointFromNodeToPage', {
       configurable: true,
@@ -235,7 +264,7 @@ describe('ArtPlayerEngine', () => {
         enhancements={{
           adFiltering: { enabled: true, onChange: onAdChange },
           skip: {
-            config: { enable: false, intro_time: 0, outro_time: 0 },
+            config: { enable: false, intro_time: 12, outro_time: -34 },
             onChange: onSkipChange,
           },
           onNextEpisode,
@@ -250,6 +279,19 @@ describe('ArtPlayerEngine', () => {
     );
     const player = mockArtInstances[0];
 
+    expect(player.config.settings[3]).toEqual(
+      expect.objectContaining({
+        icon: expect.stringContaining('<svg'),
+        tooltip: '00:12',
+      })
+    );
+    expect(player.config.settings[4]).toEqual(
+      expect.objectContaining({
+        icon: expect.stringContaining('<svg'),
+        tooltip: '-00:34',
+      })
+    );
+
     player.config.settings[0].onClick();
     player.config.settings[1].onSwitch({ switch: false });
     player.config.controls[0].click();
@@ -257,8 +299,8 @@ describe('ArtPlayerEngine', () => {
     expect(onAdChange).toHaveBeenCalledWith(false, expect.any(Object));
     expect(onSkipChange).toHaveBeenCalledWith({
       enable: true,
-      intro_time: 0,
-      outro_time: 0,
+      intro_time: 12,
+      outro_time: -34,
     });
     expect(onNextEpisode).toHaveBeenCalledTimes(1);
   });

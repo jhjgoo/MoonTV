@@ -295,7 +295,11 @@ export const ArtPlayerEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
           {
             name: '设置片头',
             html: '设置片头',
-            tooltip: '设置片头时间',
+            icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="12" r="2" fill="#ffffff"/><path d="M9 12L17 12" stroke="#ffffff" stroke-width="2"/><path d="M17 6L17 18" stroke="#ffffff" stroke-width="2"/></svg>',
+            tooltip:
+              props.enhancements?.skip?.config.intro_time === 0
+                ? '设置片头时间'
+                : formatTime(props.enhancements?.skip?.config.intro_time ?? 0),
             onClick() {
               const skip = propsRef.current.enhancements?.skip;
               if (!skip || engine.currentTime <= 0) return undefined;
@@ -310,7 +314,13 @@ export const ArtPlayerEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
           {
             name: '设置片尾',
             html: '设置片尾',
-            tooltip: '设置片尾时间',
+            icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 6L7 18" stroke="#ffffff" stroke-width="2"/><path d="M7 12L15 12" stroke="#ffffff" stroke-width="2"/><circle cx="19" cy="12" r="2" fill="#ffffff"/></svg>',
+            tooltip:
+              (props.enhancements?.skip?.config.outro_time ?? 0) >= 0
+                ? '设置片尾时间'
+                : `-${formatTime(
+                    -(props.enhancements?.skip?.config.outro_time ?? 0)
+                  )}`,
             onClick() {
               const skip = propsRef.current.enhancements?.skip;
               const outroTime = -(engine.duration - engine.currentTime) || 0;
@@ -357,6 +367,7 @@ export const ArtPlayerEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
           if (isWebkit) engine.playbackRate = restore.playbackRate;
         }
         preservedSnapshotRef.current = undefined;
+        propsRef.current.onCanPlay?.(snapshotFor(engine));
       });
       engine.on('video:timeupdate', () => {
         const snapshot = snapshotFor(engine);

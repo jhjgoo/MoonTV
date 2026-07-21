@@ -1315,8 +1315,8 @@ function PlayPageClient() {
                     urlOverride={searchParams.get('player')}
                     onReady={() => {
                       setError(null);
-                      setIsVideoLoading(false);
                     }}
+                    onCanPlay={() => setIsVideoLoading(false)}
                     onTimeUpdate={handlePlayerTimeUpdate}
                     onEnded={handlePlayerEnded}
                     onPause={() => void saveCurrentPlayProgress()}

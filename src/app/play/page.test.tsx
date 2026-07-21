@@ -136,6 +136,7 @@ describe('PlayPage player boundary', () => {
       autoPlay: true,
     });
     expect(mockPlayerProps.urlOverride).toBe('artplayer');
+    expect(mockPlayerProps).toHaveProperty('onCanPlay', expect.any(Function));
 
     fireEvent.keyDown(document, { key: 'ArrowRight' });
     fireEvent.keyDown(document, { key: 'ArrowUp' });
@@ -151,5 +152,11 @@ describe('PlayPage player boundary', () => {
       await Promise.resolve();
     });
     expect(mockPlayerHandle.getSnapshot).toHaveBeenCalled();
+    expect(screen.getByText('🔄 切换播放源...')).toBeInTheDocument();
+
+    act(() => {
+      (mockPlayerProps as any).onCanPlay();
+    });
+    expect(screen.queryByText('🔄 切换播放源...')).not.toBeInTheDocument();
   });
 });

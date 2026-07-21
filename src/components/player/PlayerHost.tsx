@@ -23,6 +23,8 @@ import type {
 import { resolvePlayerPreference } from './player-preference';
 
 const noopReady: PlayerEngineProps['onReady'] = () => undefined;
+const noopCanPlay: NonNullable<PlayerEngineProps['onCanPlay']> = () =>
+  undefined;
 const noopTimeUpdate: PlayerEngineProps['onTimeUpdate'] = () => undefined;
 const noopEnded: PlayerEngineProps['onEnded'] = () => undefined;
 const noopPlay: PlayerEngineProps['onPlay'] = () => undefined;
@@ -89,6 +91,7 @@ export interface PlayerHostProps {
   urlOverride: string | null;
   restoreSnapshot?: PlayerSnapshot;
   onReady?: PlayerEngineProps['onReady'];
+  onCanPlay?: PlayerEngineProps['onCanPlay'];
   onTimeUpdate?: PlayerEngineProps['onTimeUpdate'];
   onEnded?: PlayerEngineProps['onEnded'];
   onPlay?: PlayerEngineProps['onPlay'];
@@ -111,6 +114,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
       engines,
       media,
       onEngineChange,
+      onCanPlay,
       onEnded,
       onFailure,
       onPause,
@@ -181,6 +185,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
         media={media}
         restoreSnapshot={restoreSnapshot}
         onEnded={onEnded ?? noopEnded}
+        onCanPlay={onCanPlay ?? noopCanPlay}
         onFailure={onFailure ?? noopFailure}
         onPause={onPause ?? noopPause}
         onPlay={onPlay ?? noopPlay}
