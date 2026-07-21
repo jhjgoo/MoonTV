@@ -624,6 +624,69 @@ describe('PlayerHost', () => {
     expect(onFailure).not.toHaveBeenCalled();
   });
 
+  test('finishes fallback switching and discards a stale snapshot after the media URL changes', async () => {
+    const snapshot = {
+      currentTime: 48,
+      duration: 120,
+      volume: 0.35,
+      playbackRate: 1.5,
+      paused: true,
+    };
+    const vidstackProps = jest.fn();
+    const artplayerProps = jest.fn();
+    const onSwitchingChange = jest.fn();
+    const Vidstack = createFakeEngine(
+      'stale-fallback-vidstack-engine',
+      { ...createFakeHandle(), getSnapshot: () => snapshot },
+      vidstackProps
+    );
+    const ArtPlayer = createFakeEngine(
+      'stale-fallback-artplayer-engine',
+      createFakeHandle(),
+      artplayerProps
+    );
+    const view = render(
+      <PlayerHost
+        media={{ url: 'https://example.com/failed.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer, vidstack: Vidstack }}
+        resolvePreference={() => 'vidstack'}
+        onSwitchingChange={onSwitchingChange}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('stale-fallback-vidstack-engine')
+      ).toBeInTheDocument();
+    });
+    act(() =>
+      vidstackProps.mock.calls.at(-1)?.[0].onFailure({
+        kind: 'playback',
+        fatal: true,
+        message: 'Vidstack 播放错误',
+      })
+    );
+
+    view.rerender(
+      <PlayerHost
+        media={{ url: 'https://example.com/current.m3u8', title: 'Episode 2' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer, vidstack: Vidstack }}
+        resolvePreference={() => 'vidstack'}
+        onSwitchingChange={onSwitchingChange}
+      />
+    );
+    expect(artplayerProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ restoreSnapshot: undefined })
+    );
+
+    act(() => artplayerProps.mock.calls.at(-1)?.[0].onCanPlay(snapshot));
+    expect(onSwitchingChange).toHaveBeenNthCalledWith(2, false);
+    act(() => artplayerProps.mock.calls.at(-1)?.[0].onCanPlay(snapshot));
+    expect(onSwitchingChange).toHaveBeenCalledTimes(2);
+  });
+
   test('does not fall back for remote Vidstack failures or an initial ArtPlayer failure', async () => {
     const vidstackProps = jest.fn();
     const artplayerProps = jest.fn();

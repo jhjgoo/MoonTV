@@ -217,5 +217,11 @@ describe('PlayPage player boundary', () => {
       await Promise.resolve();
     });
     expect(savePlayRecord).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      mockPlayerProps.onPause(snapshot);
+      await Promise.resolve();
+    });
+    expect(savePlayRecord).toHaveBeenCalledTimes(2);
   });
 });

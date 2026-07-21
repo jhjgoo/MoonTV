@@ -189,12 +189,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
       snapshot
     ) => {
       onCanPlay?.(snapshot);
-      if (
-        engine === 'artplayer' &&
-        fallbackSwitchingRef.current &&
-        fallbackSnapshot &&
-        fallbackMediaUrl === media.url
-      ) {
+      if (engine === 'artplayer' && fallbackSwitchingRef.current) {
         fallbackSwitchingRef.current = false;
         setFallbackSnapshot(undefined);
         setFallbackMediaUrl(undefined);
