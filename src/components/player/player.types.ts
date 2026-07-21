@@ -1,3 +1,9 @@
+import type {
+  ForwardRefExoticComponent,
+  PropsWithoutRef,
+  RefAttributes,
+} from 'react';
+
 export type PlayerEngine = 'artplayer' | 'vidstack';
 
 export interface PlayerMedia {
@@ -41,10 +47,28 @@ export interface PlayerHandle {
   getSnapshot(): PlayerSnapshot;
 }
 
-export interface PlayerEngineProps<TEnhancements = unknown> {
+export interface PlayerSkipConfig {
+  enable: boolean;
+  intro_time: number;
+  outro_time: number;
+}
+
+export interface PlayerEnhancements {
+  adFiltering?: {
+    enabled: boolean;
+    onChange: (value: boolean, snapshot: PlayerSnapshot) => void;
+  };
+  skip?: {
+    config: PlayerSkipConfig;
+    onChange: (config: PlayerSkipConfig) => void;
+  };
+  onNextEpisode?: () => void;
+}
+
+export interface PlayerEngineProps {
   media: PlayerMedia;
   restoreSnapshot?: PlayerSnapshot;
-  enhancements?: TEnhancements;
+  enhancements?: PlayerEnhancements;
   onReady: (handle: PlayerHandle) => void;
   onTimeUpdate: (snapshot: PlayerSnapshot) => void;
   onEnded: () => void;
@@ -52,3 +76,7 @@ export interface PlayerEngineProps<TEnhancements = unknown> {
   onPause: (snapshot: PlayerSnapshot) => void;
   onFailure: (failure: PlayerFailure) => void;
 }
+
+export type PlayerEngineComponent = ForwardRefExoticComponent<
+  PropsWithoutRef<PlayerEngineProps> & RefAttributes<PlayerHandle>
+>;

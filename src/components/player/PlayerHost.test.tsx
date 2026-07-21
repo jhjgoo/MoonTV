@@ -1,7 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { createRef, forwardRef, useImperativeHandle } from 'react';
 
-import type { PlayerEngineProps, PlayerHandle } from './player.types';
+import type {
+  PlayerEngineComponent,
+  PlayerEngineProps,
+  PlayerEnhancements,
+  PlayerHandle,
+} from './player.types';
 import {
   ARTPLAYER_CAPABILITIES,
   PlayerHost,
@@ -26,12 +31,17 @@ function createFakeHandle(): PlayerHandle {
   };
 }
 
-function createFakeEngine(testId: string, handle = createFakeHandle()) {
+function createFakeEngine(
+  testId: string,
+  handle = createFakeHandle(),
+  onRender?: (props: PlayerEngineProps) => void
+): PlayerEngineComponent {
   return forwardRef<PlayerHandle, PlayerEngineProps>(function FakeEngine(
-    _props,
+    props,
     ref
   ) {
     useImperativeHandle(ref, () => handle);
+    onRender?.(props);
 
     return <div data-testid={testId} />;
   });
@@ -107,6 +117,49 @@ describe('PlayerHost', () => {
     expect(
       screen.queryByTestId('fake-vidstack-engine')
     ).not.toBeInTheDocument();
+  });
+
+  test('forwards enhancements unchanged to the selected engine', async () => {
+    const enhancements: PlayerEnhancements = {
+      adFiltering: {
+        enabled: true,
+        onChange: jest.fn(),
+      },
+      skip: {
+        config: {
+          enable: true,
+          intro_time: 12,
+          outro_time: 24,
+        },
+        onChange: jest.fn(),
+      },
+      onNextEpisode: jest.fn(),
+    };
+    const onRender = jest.fn();
+    const FakeEngine = createFakeEngine(
+      'enhancements-artplayer-engine',
+      createFakeHandle(),
+      onRender
+    );
+
+    render(
+      <PlayerHost
+        enhancements={enhancements}
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{ artplayer: FakeEngine }}
+        resolvePreference={() => 'artplayer'}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('enhancements-artplayer-engine')
+      ).toBeInTheDocument();
+    });
+    expect(onRender).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enhancements })
+    );
   });
 
   test('renders the safe ArtPlayer placeholder when no adapter is injected', async () => {
@@ -229,6 +282,36 @@ describe('PlayerHost', () => {
       screen.queryByTestId('fake-artplayer-engine')
     ).not.toBeInTheDocument();
   });
+
+  test.each([
+    ['missing', null],
+    ['invalid', 'unsupported-player'],
+  ])(
+    'uses the ArtPlayer default for a %s stored preference',
+    async (_description, storedPreference) => {
+      if (storedPreference !== null) {
+        localStorage.setItem('preferredPlayer', storedPreference);
+      }
+
+      render(
+        <PlayerHost
+          media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+          urlOverride={null}
+          engines={{
+            artplayer: FakeArtPlayerEngine,
+            vidstack: FakeVidstackEngine,
+          }}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('fake-artplayer-engine')).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByTestId('fake-vidstack-engine')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   test('reports the selected engine capabilities once and does not live-switch on rerender', async () => {
     const onEngineChange = jest.fn();

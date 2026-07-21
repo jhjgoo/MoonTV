@@ -1,9 +1,6 @@
 'use client';
 
 import {
-  type ForwardRefExoticComponent,
-  type PropsWithoutRef,
-  type RefAttributes,
   forwardRef,
   useEffect,
   useImperativeHandle,
@@ -14,17 +11,15 @@ import {
 import type {
   PlayerCapabilities,
   PlayerEngine,
+  PlayerEngineComponent,
   PlayerEngineProps,
+  PlayerEnhancements,
   PlayerFailure,
   PlayerHandle,
   PlayerMedia,
   PlayerSnapshot,
 } from './player.types';
 import { resolvePlayerPreference } from './player-preference';
-
-type PlayerEngineComponent = ForwardRefExoticComponent<
-  PropsWithoutRef<PlayerEngineProps> & RefAttributes<PlayerHandle>
->;
 
 const noopReady: PlayerEngineProps['onReady'] = () => undefined;
 const noopTimeUpdate: PlayerEngineProps['onTimeUpdate'] = () => undefined;
@@ -88,6 +83,7 @@ function capabilitiesFor(engine: PlayerEngine): PlayerCapabilities {
 }
 
 export interface PlayerHostProps {
+  enhancements?: PlayerEnhancements;
   media: PlayerMedia;
   urlOverride: string | null;
   restoreSnapshot?: PlayerSnapshot;
@@ -110,6 +106,7 @@ export interface PlayerHostProps {
 export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
   function PlayerHost(
     {
+      enhancements,
       engines,
       media,
       onEngineChange,
@@ -178,6 +175,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
     return (
       <Engine
         ref={engineRef}
+        enhancements={enhancements}
         media={media}
         restoreSnapshot={restoreSnapshot}
         onEnded={onEnded ?? noopEnded}
