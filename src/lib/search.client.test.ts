@@ -1,7 +1,37 @@
 import {
   fetchAllSearchResults,
+  fetchSearchBatch,
   shouldFetchSearchImmediately,
 } from './search.client';
+
+describe('fetchSearchBatch', () => {
+  test('loads one requested server-side batch', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: [{ id: 'batch-2' }], totalPages: 4 }),
+    });
+
+    const batch = await fetchSearchBatch('金瓶梅', 2, fetchImpl as never);
+
+    expect(batch.results[0].id).toBe('batch-2');
+    expect(batch.totalPages).toBe(4);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `/api/search?q=${encodeURIComponent('金瓶梅')}&page=2`,
+      { cache: 'no-store' }
+    );
+  });
+
+  test('rejects malformed batch responses', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: 'invalid', totalPages: 0 }),
+    });
+
+    await expect(
+      fetchSearchBatch('测试', 0, fetchImpl as never)
+    ).rejects.toThrow('搜索响应格式错误');
+  });
+});
 
 describe('fetchAllSearchResults', () => {
   test('loads and merges every server-side source batch', async () => {

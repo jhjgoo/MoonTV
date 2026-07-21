@@ -1,8 +1,8 @@
 import type { SearchResult } from './types';
 
-interface SearchBatchResponse {
-  results?: SearchResult[];
-  totalPages?: number;
+export interface SearchBatchResponse {
+  results: SearchResult[];
+  totalPages: number;
 }
 
 const SEARCH_BATCH_CONCURRENCY = 3;
@@ -14,10 +14,10 @@ export function shouldFetchSearchImmediately(
   return currentQuery?.trim() === nextQuery;
 }
 
-async function fetchSearchBatch(
+export async function fetchSearchBatch(
   query: string,
   page: number,
-  fetchImpl: typeof fetch,
+  fetchImpl: typeof fetch = fetch,
   signal?: AbortSignal
 ): Promise<SearchBatchResponse> {
   const response = await fetchImpl(
@@ -27,7 +27,15 @@ async function fetchSearchBatch(
   if (!response.ok) {
     throw new Error('搜索失败');
   }
-  return response.json() as Promise<SearchBatchResponse>;
+  const payload = (await response.json()) as Partial<SearchBatchResponse>;
+  if (
+    !Array.isArray(payload.results) ||
+    !Number.isInteger(payload.totalPages) ||
+    (payload.totalPages || 0) < 1
+  ) {
+    throw new Error('搜索响应格式错误');
+  }
+  return payload as SearchBatchResponse;
 }
 
 export async function fetchAllSearchResults(
@@ -36,7 +44,7 @@ export async function fetchAllSearchResults(
   signal?: AbortSignal
 ): Promise<SearchResult[]> {
   const firstBatch = await fetchSearchBatch(query, 0, fetchImpl, signal);
-  const totalPages = Math.max(1, firstBatch.totalPages || 1);
+  const totalPages = firstBatch.totalPages;
   const remainingBatches = new Array<SearchBatchResponse>(totalPages - 1);
   let nextPage = 1;
   await Promise.all(
@@ -57,7 +65,5 @@ export async function fetchAllSearchResults(
     )
   );
 
-  return [firstBatch, ...remainingBatches].flatMap(
-    (batch) => batch.results || []
-  );
+  return [firstBatch, ...remainingBatches].flatMap((batch) => batch.results);
 }
