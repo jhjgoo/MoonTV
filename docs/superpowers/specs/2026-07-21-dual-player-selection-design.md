@@ -3,7 +3,7 @@
 ## 文档状态
 
 - 日期：2026-07-21
-- 状态：待书面审阅
+- 状态：已确认，进入实施
 - 影响范围：本地设置、播放页播放器宿主、ArtPlayer 与 Vidstack 实现
 - 相关调研：[MoonTV 跨设备投屏与播放器选型调研](../../research/2026-07-21-cross-device-casting-player-options.md)
 
