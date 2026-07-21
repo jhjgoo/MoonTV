@@ -44,6 +44,7 @@ interface MediaPlayerInstance {
   playbackRate: number;
   paused: boolean;
   remotePlaybackType?: string;
+  remotePlaybackState?: string;
   addEventListener(type: string, listener: EventListener): void;
   removeEventListener(type: string, listener: EventListener): void;
   state?: { fullscreen?: boolean };
@@ -186,7 +187,12 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
 
     const handleError = (cause: unknown) => {
       const remotePlaybackType = playerRef.current?.remotePlaybackType;
-      if (remotePlaybackType && remotePlaybackType !== 'none') {
+      const remotePlaybackState = playerRef.current?.remotePlaybackState;
+      if (
+        remotePlaybackType &&
+        remotePlaybackType !== 'none' &&
+        remotePlaybackState !== 'disconnected'
+      ) {
         propsRef.current.onFailure({
           kind: 'remote-playback',
           fatal: false,
