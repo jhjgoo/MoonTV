@@ -166,6 +166,7 @@ export const ArtPlayerEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
 
       if (existingPlayer) {
         preservedSnapshotRef.current = snapshotFor(existingPlayer);
+        restoredMediaUrlRef.current = null;
         hlsRef.current?.destroy();
         if (
           existingPlayer.video?.hls &&

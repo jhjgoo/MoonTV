@@ -279,6 +279,62 @@ describe('ArtPlayerEngine', () => {
     expect(player.currentTime).toBe(36);
   });
 
+  test('restores the latest snapshot when ad filtering recreates the engine on the same URL', () => {
+    Object.defineProperty(window, 'webkitConvertPointFromNodeToPage', {
+      configurable: true,
+      value: jest.fn(),
+    });
+    const callbacks = {
+      onReady: jest.fn(),
+      onTimeUpdate: jest.fn(),
+      onEnded: jest.fn(),
+      onPlay: jest.fn(),
+      onPause: jest.fn(),
+      onFailure: jest.fn(),
+    };
+    const media = { url: 'https://example.com/episode.m3u8', title: '第一集' };
+    const view = render(
+      <ArtPlayerEngine
+        {...callbacks}
+        media={media}
+        restoreSnapshot={{
+          currentTime: 12,
+          duration: 120,
+          volume: 0.7,
+          playbackRate: 1,
+          paused: false,
+        }}
+        enhancements={{ adFiltering: { enabled: false, onChange: jest.fn() } }}
+      />
+    );
+    const first = mockArtInstances[0];
+    act(() => first.emit('video:canplay'));
+    first.currentTime = 44;
+    first.volume = 0.3;
+    first.playbackRate = 1.5;
+
+    view.rerender(
+      <ArtPlayerEngine
+        {...callbacks}
+        media={media}
+        restoreSnapshot={{
+          currentTime: 44,
+          duration: 120,
+          volume: 0.3,
+          playbackRate: 1.5,
+          paused: false,
+        }}
+        enhancements={{ adFiltering: { enabled: true, onChange: jest.fn() } }}
+      />
+    );
+    const recreated = mockArtInstances[1];
+    act(() => recreated.emit('video:canplay'));
+
+    expect(recreated.currentTime).toBe(44);
+    expect(recreated.volume).toBe(0.3);
+    expect(recreated.playbackRate).toBe(1.5);
+  });
+
   test('reports fatal initialization failures when ArtPlayer construction throws', () => {
     const cause = new Error('constructor failed');
     const onFailure = jest.fn();
