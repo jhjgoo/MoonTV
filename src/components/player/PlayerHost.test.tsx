@@ -52,6 +52,7 @@ const FakeVidstackEngine = createFakeEngine('fake-vidstack-engine');
 
 describe('PlayerHost', () => {
   afterEach(() => {
+    jest.restoreAllMocks();
     localStorage.clear();
   });
 
@@ -281,6 +282,87 @@ describe('PlayerHost', () => {
     expect(
       screen.queryByTestId('fake-artplayer-engine')
     ).not.toBeInTheDocument();
+  });
+
+  test('uses ArtPlayer when a synchronous resolver error occurs without writing storage', async () => {
+    localStorage.setItem('preferredPlayer', 'vidstack');
+    const setItem = jest.spyOn(Storage.prototype, 'setItem');
+    const onEngineChange = jest.fn();
+
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{
+          artplayer: FakeArtPlayerEngine,
+          vidstack: FakeVidstackEngine,
+        }}
+        onEngineChange={onEngineChange}
+        resolvePreference={() => {
+          throw new Error('resolver failed');
+        }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('fake-artplayer-engine')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId('fake-vidstack-engine')
+    ).not.toBeInTheDocument();
+    expect(onEngineChange).toHaveBeenCalledWith(
+      'artplayer',
+      ARTPLAYER_CAPABILITIES
+    );
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  test('uses ArtPlayer when an asynchronous resolver error occurs', async () => {
+    const onEngineChange = jest.fn();
+
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{
+          artplayer: FakeArtPlayerEngine,
+          vidstack: FakeVidstackEngine,
+        }}
+        onEngineChange={onEngineChange}
+        resolvePreference={() => Promise.reject(new Error('resolver failed'))}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('fake-artplayer-engine')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId('fake-vidstack-engine')
+    ).not.toBeInTheDocument();
+    expect(onEngineChange).toHaveBeenCalledTimes(1);
+  });
+
+  test('ignores resolver rejection after unmounting', async () => {
+    let rejectResolver: (reason?: unknown) => void = () => undefined;
+    const resolution = new Promise<PlayerEngine>((_resolve, reject) => {
+      rejectResolver = reject;
+    });
+    const onEngineChange = jest.fn();
+    const { unmount } = render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        onEngineChange={onEngineChange}
+        resolvePreference={() => resolution}
+      />
+    );
+
+    unmount();
+    rejectResolver(new Error('resolver failed after unmount'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onEngineChange).not.toHaveBeenCalled();
   });
 
   test.each([

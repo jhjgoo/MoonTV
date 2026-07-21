@@ -148,18 +148,19 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
         resolvePreference: initialResolvePreference,
         urlOverride: initialUrlOverride,
       } = initialResolution.current;
-
-      void Promise.resolve(initialResolvePreference(initialUrlOverride)).then(
-        (resolvedEngine) => {
-          if (active) {
-            setEngine(resolvedEngine);
-            initialOnEngineChange?.(
-              resolvedEngine,
-              capabilitiesFor(resolvedEngine)
-            );
-          }
+      const selectEngine = (resolvedEngine: PlayerEngine) => {
+        if (active) {
+          setEngine(resolvedEngine);
+          initialOnEngineChange?.(
+            resolvedEngine,
+            capabilitiesFor(resolvedEngine)
+          );
         }
-      );
+      };
+
+      void Promise.resolve()
+        .then(() => initialResolvePreference(initialUrlOverride))
+        .then(selectEngine, () => selectEngine('artplayer'));
 
       return () => {
         active = false;

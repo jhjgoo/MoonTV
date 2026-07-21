@@ -30,11 +30,11 @@ export interface PlayerFailure {
 }
 
 export interface PlayerCapabilities {
-  airPlay: boolean;
-  googleCast: boolean;
-  adFiltering: boolean;
-  skipConfig: boolean;
-  mobileGestures: boolean;
+  readonly airPlay: boolean;
+  readonly googleCast: boolean;
+  readonly adFiltering: boolean;
+  readonly skipConfig: boolean;
+  readonly mobileGestures: boolean;
 }
 
 export interface PlayerHandle {
