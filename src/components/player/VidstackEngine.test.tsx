@@ -22,8 +22,14 @@ const providerUnmount = jest.fn();
 
 jest.mock('@vidstack/react', () => ({
   MediaPlayer: forwardRef(function MockMediaPlayer(props: any, ref: any) {
-    if (typeof ref === 'function') ref(player);
-    else if (ref) ref.current = player;
+    useEffect(() => {
+      if (typeof ref === 'function') {
+        ref(player);
+        return () => ref(null);
+      }
+      if (ref) ref.current = player;
+      return undefined;
+    }, [ref]);
     mediaPlayerProps = props;
     return <div data-testid='vidstack-media-player'>{props.children}</div>;
   }),
@@ -187,5 +193,36 @@ describe('VidstackEngine', () => {
 
     unmount();
     expect(providerUnmount).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not announce ready again and clear a fatal error after rerender', () => {
+    let fatalError: string | null = null;
+    const onReady = jest.fn(() => {
+      fatalError = null;
+    });
+    const onFailure = jest.fn(() => {
+      fatalError = 'provider failed';
+    });
+    const view = render(
+      <VidstackEngine
+        {...defaultProps}
+        onFailure={onFailure}
+        onReady={onReady}
+      />
+    );
+
+    act(() => mediaPlayerProps.onError(new Error('provider failed')));
+    expect(fatalError).toBe('provider failed');
+
+    view.rerender(
+      <VidstackEngine
+        {...defaultProps}
+        onFailure={onFailure}
+        onReady={onReady}
+      />
+    );
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(fatalError).toBe('provider failed');
   });
 });

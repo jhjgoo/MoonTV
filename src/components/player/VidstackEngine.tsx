@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefAttributes,
   forwardRef,
+  useCallback,
   useImperativeHandle,
   useRef,
 } from 'react';
@@ -153,10 +154,10 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
       });
     };
 
-    const setPlayerRef = (player: MediaPlayerInstance | null) => {
+    const setPlayerRef = useCallback((player: MediaPlayerInstance | null) => {
       playerRef.current = player;
       if (player) propsRef.current.onReady(handleRef.current);
-    };
+    }, []);
 
     return (
       <MediaPlayer
