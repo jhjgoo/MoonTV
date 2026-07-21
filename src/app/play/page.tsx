@@ -1316,12 +1316,18 @@ function PlayPageClient() {
                     onReady={() => {
                       setError(null);
                     }}
-                    onCanPlay={() => setIsVideoLoading(false)}
+                    onCanPlay={() => {
+                      resumeTimeRef.current = null;
+                      setResumeSnapshot(undefined);
+                      setIsVideoLoading(false);
+                    }}
                     onTimeUpdate={handlePlayerTimeUpdate}
                     onEnded={handlePlayerEnded}
                     onPause={() => void saveCurrentPlayProgress()}
                     onPlay={() => undefined}
-                    onFailure={(failure) => setError(failure.message)}
+                    onFailure={(failure) => {
+                      if (failure.fatal) setError(failure.message);
+                    }}
                   />
                 </div>
 

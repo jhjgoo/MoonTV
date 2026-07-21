@@ -8,6 +8,7 @@ import type { PlayerHandle } from './player.types';
 
 const mockArtInstances: any[] = [];
 const mockHlsInstances: any[] = [];
+let mockArtConstructorError: unknown;
 
 jest.mock('artplayer', () => {
   class MockArtplayer {
@@ -25,6 +26,7 @@ jest.mock('artplayer', () => {
     title = '';
     poster = '';
     notice = { show: '' };
+    setting = { update: jest.fn() };
     events = new Map<string, (...args: any[]) => void>();
     destroy = jest.fn();
     pause = jest.fn(() => {
@@ -35,6 +37,7 @@ jest.mock('artplayer', () => {
     });
 
     constructor(config: any) {
+      if (mockArtConstructorError) throw mockArtConstructorError;
       this.config = config;
       mockArtInstances.push(this);
     }
@@ -87,6 +90,7 @@ describe('ArtPlayerEngine', () => {
   beforeEach(() => {
     mockArtInstances.length = 0;
     mockHlsInstances.length = 0;
+    mockArtConstructorError = undefined;
   });
 
   afterEach(() => {
@@ -223,6 +227,124 @@ describe('ArtPlayerEngine', () => {
     expect(props.onReady).not.toHaveBeenCalled();
     expect(onCanPlay).toHaveBeenCalledWith(
       expect.objectContaining({ currentTime: 12, duration: 120 })
+    );
+  });
+
+  test('consumes a restore snapshot once per media URL instead of rewinding on later canplay events', () => {
+    const view = render(
+      <ArtPlayerEngine
+        media={{ url: 'https://example.com/one.m3u8', title: '第一集' }}
+        restoreSnapshot={{
+          currentTime: 20,
+          duration: 120,
+          volume: 0.7,
+          playbackRate: 1,
+          paused: false,
+        }}
+        onReady={jest.fn()}
+        onTimeUpdate={jest.fn()}
+        onEnded={jest.fn()}
+        onPlay={jest.fn()}
+        onPause={jest.fn()}
+        onFailure={jest.fn()}
+      />
+    );
+    const player = mockArtInstances[0];
+
+    act(() => player.emit('video:canplay'));
+    expect(player.currentTime).toBe(20);
+    player.currentTime = 68;
+    act(() => player.emit('video:canplay'));
+    expect(player.currentTime).toBe(68);
+
+    view.rerender(
+      <ArtPlayerEngine
+        media={{ url: 'https://example.com/two.m3u8', title: '第二集' }}
+        restoreSnapshot={{
+          currentTime: 36,
+          duration: 120,
+          volume: 0.7,
+          playbackRate: 1,
+          paused: false,
+        }}
+        onReady={jest.fn()}
+        onTimeUpdate={jest.fn()}
+        onEnded={jest.fn()}
+        onPlay={jest.fn()}
+        onPause={jest.fn()}
+        onFailure={jest.fn()}
+      />
+    );
+    act(() => player.emit('video:canplay'));
+    expect(player.currentTime).toBe(36);
+  });
+
+  test('reports fatal initialization failures when ArtPlayer construction throws', () => {
+    const cause = new Error('constructor failed');
+    const onFailure = jest.fn();
+    mockArtConstructorError = cause;
+
+    render(
+      <ArtPlayerEngine
+        media={{ url: 'https://example.com/episode.m3u8', title: '第一集' }}
+        onReady={jest.fn()}
+        onTimeUpdate={jest.fn()}
+        onEnded={jest.fn()}
+        onPlay={jest.fn()}
+        onPause={jest.fn()}
+        onFailure={onFailure}
+      />
+    );
+
+    expect(onFailure).toHaveBeenCalledWith({
+      kind: 'playback',
+      fatal: true,
+      message: '播放器初始化失败',
+      cause,
+    });
+  });
+
+  test('updates mounted skip settings when enhancement configuration changes', () => {
+    const onSkipChange = jest.fn();
+    const props = {
+      media: { url: 'https://example.com/episode.m3u8', title: '第一集' },
+      enhancements: {
+        skip: {
+          config: { enable: true, intro_time: 12, outro_time: -34 },
+          onChange: onSkipChange,
+        },
+      },
+      onReady: jest.fn(),
+      onTimeUpdate: jest.fn(),
+      onEnded: jest.fn(),
+      onPlay: jest.fn(),
+      onPause: jest.fn(),
+      onFailure: jest.fn(),
+    };
+    const view = render(<ArtPlayerEngine {...props} />);
+    const player = mockArtInstances[0];
+    player.setting.update.mockClear();
+
+    view.rerender(
+      <ArtPlayerEngine
+        {...props}
+        enhancements={{
+          skip: {
+            config: { enable: false, intro_time: 0, outro_time: 0 },
+            onChange: onSkipChange,
+          },
+        }}
+      />
+    );
+
+    expect(player.setting.update).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '跳过片头片尾', switch: false })
+    );
+    expect(player.setting.update).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '设置片头', tooltip: '设置片头时间' })
+    );
+    expect(player.setting.update).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '设置片尾', tooltip: '设置片尾时间' })
     );
   });
 

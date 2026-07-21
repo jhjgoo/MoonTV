@@ -138,6 +138,16 @@ describe('PlayPage player boundary', () => {
     expect(mockPlayerProps.urlOverride).toBe('artplayer');
     expect(mockPlayerProps).toHaveProperty('onCanPlay', expect.any(Function));
 
+    act(() => {
+      mockPlayerProps.onFailure({
+        kind: 'playback',
+        fatal: false,
+        message: '可恢复错误',
+      });
+    });
+    expect(screen.getByTestId('player-host')).toBeInTheDocument();
+    expect(screen.queryByText('哎呀，出现了一些问题')).not.toBeInTheDocument();
+
     fireEvent.keyDown(document, { key: 'ArrowRight' });
     fireEvent.keyDown(document, { key: 'ArrowUp' });
     fireEvent.keyDown(document, { key: ' ' });
