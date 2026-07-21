@@ -133,7 +133,7 @@ test('write and reset persist canonical values', () => {
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/player-preference.test.ts`
+Run: `rtk pnpm test --runInBand src/components/player/player-preference.test.ts`
 
 Expected: FAIL because `./player-preference` does not exist.
 
@@ -174,7 +174,7 @@ Also create `player.types.ts` initially with `PlayerEngine` so this module compi
 
 - [ ] **Step 4: Run the preference tests and verify GREEN**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/player-preference.test.ts`
+Run: `rtk pnpm test --runInBand src/components/player/player-preference.test.ts`
 
 Expected: PASS, 7 cases.
 
@@ -209,7 +209,7 @@ test('reset restores ArtPlayer', () => {
 
 - [ ] **Step 6: Run UserMenu tests and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/UserMenu.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/UserMenu.test.tsx`
 
 Expected: FAIL because the player radio group is absent.
 
@@ -256,7 +256,7 @@ Do not add a `storage` event listener or dispatch a custom setting event; an alr
 
 - [ ] **Step 8: Run focused tests and commit**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/player-preference.test.ts src/components/UserMenu.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/player-preference.test.ts src/components/UserMenu.test.tsx`
 
 Expected: PASS.
 
@@ -339,7 +339,7 @@ In the first test, inject `resolvePreference={() => pending.promise}`. `resolveP
 
 - [ ] **Step 2: Run host tests and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/PlayerHost.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/PlayerHost.test.tsx`
 
 Expected: FAIL because `PlayerHost` does not exist.
 
@@ -394,7 +394,7 @@ Define immutable `ARTPLAYER_CAPABILITIES` and `VIDSTACK_CAPABILITIES` constants 
 
 - [ ] **Step 4: Run host tests, typecheck, and commit**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/PlayerHost.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/PlayerHost.test.tsx`
 
 Expected: PASS for loading, local preference, URL override, invalid URL, and one-engine-only cases.
 
@@ -472,7 +472,7 @@ Add cases for non-WebKit URL switch, WebKit rebuild, HLS network recovery, HLS m
 
 - [ ] **Step 2: Run the adapter test and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/ArtPlayerEngine.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/ArtPlayerEngine.test.tsx`
 
 Expected: FAIL because the adapter does not exist.
 
@@ -559,7 +559,7 @@ Update `saveCurrentPlayProgress`, source continuity, keyboard shortcuts, and epi
 
 - [ ] **Step 6: Prove ArtPlayer equivalence before Vidstack work**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/ArtPlayerEngine.test.tsx src/components/player/PlayerHost.test.tsx src/app/play/page.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/ArtPlayerEngine.test.tsx src/components/player/PlayerHost.test.tsx src/app/play/page.test.tsx`
 
 Expected: PASS.
 
@@ -607,7 +607,7 @@ Emit `onCanPlay`, `onTimeUpdate`, `onPlay`, `onPause`, and `onEnded`; verify the
 
 - [ ] **Step 2: Run the Vidstack test and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/VidstackEngine.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/VidstackEngine.test.tsx`
 
 Expected: FAIL because `VidstackEngine` does not exist.
 
@@ -655,7 +655,7 @@ Keep dependency injection available to host tests.
 
 - [ ] **Step 5: Run core tests and commit**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/VidstackEngine.test.tsx src/components/player/PlayerHost.test.tsx src/app/play/page.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/VidstackEngine.test.tsx src/components/player/PlayerHost.test.tsx src/app/play/page.test.tsx`
 
 Expected: PASS.
 
@@ -694,7 +694,7 @@ Then trigger `onError` and assert `kind: 'playback', fatal: true`. Verify a remo
 
 - [ ] **Step 2: Run the remote tests and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/VidstackEngine.test.tsx -t "Cast|remote"`
+Run: `rtk pnpm test --runInBand src/components/player/VidstackEngine.test.tsx -t "Cast|remote"`
 
 Expected: FAIL because remote errors are not separately mapped.
 
@@ -721,7 +721,7 @@ Add a README “播放器与投屏” section stating:
 
 - [ ] **Step 5: Run tests, typecheck, and commit**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/VidstackEngine.test.tsx src/components/player/PlayerHost.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/VidstackEngine.test.tsx src/components/player/PlayerHost.test.tsx`
 
 Expected: PASS.
 
@@ -776,7 +776,7 @@ Add cases for ArtPlayer initially selected, a second Vidstack fatal signal, medi
 
 - [ ] **Step 2: Run host fallback tests and verify RED**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/PlayerHost.test.tsx -t "fallback|remote|once"`
+Run: `rtk pnpm test --runInBand src/components/player/PlayerHost.test.tsx -t "fallback|remote|once"`
 
 Expected: FAIL because fallback state is not implemented.
 
@@ -814,7 +814,7 @@ Maintain `engineSwitchingRef`. Page-level `onPause` and periodic time-update han
 
 - [ ] **Step 6: Run the complete player regression set and commit**
 
-Run: `rtk pnpm test -- --runInBand src/components/player/player-preference.test.ts src/components/UserMenu.test.tsx src/components/player/PlayerHost.test.tsx src/components/player/ArtPlayerEngine.test.tsx src/components/player/VidstackEngine.test.tsx src/app/play/page.test.tsx`
+Run: `rtk pnpm test --runInBand src/components/player/player-preference.test.ts src/components/UserMenu.test.tsx src/components/player/PlayerHost.test.tsx src/components/player/ArtPlayerEngine.test.tsx src/components/player/VidstackEngine.test.tsx src/app/play/page.test.tsx`
 
 Expected: PASS.
 
@@ -836,13 +836,13 @@ rtk git commit -m "fix(播放器): Vidstack 失败时单次降级并恢复状态
 
 - [ ] **Step 1: Create the real-device matrix**
 
-Use a table with rows for iPhone/iPad Safari, Android Chrome, desktop Chrome, desktop Edge, Firefox, and HarmonyOS Browser. Columns must record browser version, ArtPlayer local playback, Vidstack local playback, AirPlay visibility/result, Google Cast visibility/result, play/pause, seek, episode change, disconnect recovery, play-record result, and categorized failure (`CORS`, codec, anti-hotlink, authentication, receiver network, unsupported browser).
+Use one row per device/browser/sample combination for iPhone/iPad Safari, Android Chrome, desktop Chrome, desktop Edge, Firefox, and HarmonyOS Browser. Keep ArtPlayer and Vidstack results in separate columns of that same row. Include date, build SHA, device model/OS, receiver/firmware, network conditions, reproducible failure symptom, browser version, local playback, AirPlay visibility/result, Google Cast visibility/result, play/pause, seek, episode change, disconnect recovery, play-record result, and categorized failure (`CORS`, codec, anti-hotlink, authentication, receiver network, unsupported browser).
 
 Add ten anonymized real-source rows plus one public CORS-enabled HLS row. Do not include credentials, cookies, subscription links, or private tokens.
 
 - [ ] **Step 2: Run the full automated suite**
 
-Run: `rtk pnpm test -- --runInBand`
+Run: `rtk pnpm test --runInBand`
 
 Expected: all suites and tests PASS; no open handles from HLS, watchdog timers, media listeners, or Cast sessions.
 
@@ -850,15 +850,15 @@ Expected: all suites and tests PASS; no open handles from HLS, watchdog timers, 
 
 Run: `rtk pnpm typecheck`
 
-Expected: PASS.
+Current baseline: 17 pre-existing `AdultKeywords` fixture errors in five admin test files. Expected player-specific check: no additional type errors in player files.
 
 Run: `rtk pnpm lint:strict`
 
-Expected: PASS with zero warnings.
+Current baseline: pre-existing `src/lib/config.ts` import-sort warning causes this zero-warning command to exit non-zero. Expected player-specific check: no additional lint errors or warnings in player files.
 
 Run: `rtk pnpm format:check`
 
-Expected: PASS. If formatting fails, run `rtk pnpm format`, review only intended files, and rerun the check.
+Current baseline: unrelated existing files may fail this repository-wide check. Format only intended files, then confirm no formatting issue in player-specific or changed files; do not claim the repository-wide command passes while unrelated failures remain.
 
 - [ ] **Step 4: Verify the production and Cloudflare Pages builds**
 
