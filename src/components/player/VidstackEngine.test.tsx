@@ -73,9 +73,16 @@ jest.mock('@vidstack/react', () => ({
       </button>
     );
   },
-  AirPlayIcon: () => <svg data-testid='airplay-icon' />,
-  ChromecastIcon: () => <svg data-testid='google-cast-icon' />,
 }));
+
+jest.mock(
+  '@vidstack/react/icons',
+  () => ({
+    AirPlayIcon: () => <svg data-testid='airplay-icon' />,
+    ChromecastIcon: () => <svg data-testid='google-cast-icon' />,
+  }),
+  { virtual: true }
+);
 
 jest.mock(
   '@vidstack/react/player/layouts/default',

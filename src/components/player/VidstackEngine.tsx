@@ -63,21 +63,17 @@ interface VidstackControlProps {
   className: string;
 }
 
-const {
-  MediaPlayer,
-  MediaProvider,
-  AirPlayButton,
-  GoogleCastButton,
-  AirPlayIcon,
-  ChromecastIcon,
-} = require('@vidstack/react') as {
-  MediaPlayer: ForwardRefExoticComponent<
-    PropsWithoutRef<VidstackMediaPlayerProps> &
-      RefAttributes<MediaPlayerInstance>
-  >;
-  MediaProvider: ComponentType;
-  AirPlayButton: ComponentType<VidstackControlProps>;
-  GoogleCastButton: ComponentType<VidstackControlProps>;
+const { MediaPlayer, MediaProvider, AirPlayButton, GoogleCastButton } =
+  require('@vidstack/react') as {
+    MediaPlayer: ForwardRefExoticComponent<
+      PropsWithoutRef<VidstackMediaPlayerProps> &
+        RefAttributes<MediaPlayerInstance>
+    >;
+    MediaProvider: ComponentType;
+    AirPlayButton: ComponentType<VidstackControlProps>;
+    GoogleCastButton: ComponentType<VidstackControlProps>;
+  };
+const { AirPlayIcon, ChromecastIcon } = require('@vidstack/react/icons') as {
   AirPlayIcon: ComponentType<{ className: string }>;
   ChromecastIcon: ComponentType<{ className: string }>;
 };
