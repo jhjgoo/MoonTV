@@ -174,14 +174,14 @@ describe('PlayPage player boundary', () => {
     expect(screen.queryByText('🔄 切换播放源...')).not.toBeInTheDocument();
   });
 
-  test('persists the final snapshot once during an engine switch and ignores internal teardown events', async () => {
+  test('persists only the pre-switch snapshot when a paused fallback restores', async () => {
     jest.useFakeTimers();
     jest.mocked(mockPlayerHandle.getSnapshot).mockReturnValue({
       currentTime: 48,
       duration: 120,
       volume: 0.35,
       playbackRate: 1.5,
-      paused: false,
+      paused: true,
     });
     render(<PlayPage />);
 
@@ -211,10 +211,11 @@ describe('PlayPage player boundary', () => {
 
     await act(async () => {
       mockPlayerProps.onReady(mockPlayerHandle);
-      mockPlayerProps.onSwitchingChange?.(false);
       mockPlayerProps.onPause(snapshot);
+      mockPlayerProps.onCanPlay(snapshot);
+      mockPlayerProps.onSwitchingChange?.(false);
       await Promise.resolve();
     });
-    expect(savePlayRecord).toHaveBeenCalledTimes(2);
+    expect(savePlayRecord).toHaveBeenCalledTimes(1);
   });
 });

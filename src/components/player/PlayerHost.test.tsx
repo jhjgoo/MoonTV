@@ -547,9 +547,12 @@ describe('PlayerHost', () => {
     act(() =>
       artplayerProps.mock.calls.at(-1)?.[0].onReady(createFakeHandle())
     );
-    expect(onSwitchingChange).toHaveBeenNthCalledWith(2, false);
+    expect(onSwitchingChange).toHaveBeenCalledTimes(1);
 
     act(() => artplayerProps.mock.calls.at(-1)?.[0].onCanPlay(snapshot));
+    expect(onSwitchingChange).toHaveBeenNthCalledWith(2, false);
+    act(() => artplayerProps.mock.calls.at(-1)?.[0].onCanPlay(snapshot));
+    expect(onSwitchingChange).toHaveBeenCalledTimes(2);
     view.rerender(
       <PlayerHost
         media={{ url: 'https://example.com/next.m3u8', title: 'Episode 2' }}
@@ -575,6 +578,50 @@ describe('PlayerHost', () => {
 
     expect(artplayerProps).toHaveBeenCalledTimes(artplayerRenderCount);
     expect(onEngineChange).toHaveBeenCalledTimes(2);
+  });
+
+  test('ignores delayed repeated fatal Vidstack failures after starting fallback', async () => {
+    const vidstackProps = jest.fn();
+    const Vidstack = createFakeEngine(
+      'delayed-failure-vidstack-engine',
+      createFakeHandle(),
+      vidstackProps
+    );
+    const ArtPlayer = createFakeEngine(
+      'delayed-failure-artplayer-engine',
+      createFakeHandle()
+    );
+    const onFailure = jest.fn();
+    const failure = {
+      kind: 'playback' as const,
+      fatal: true,
+      message: 'Vidstack 播放错误',
+    };
+
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer, vidstack: Vidstack }}
+        resolvePreference={() => 'vidstack'}
+        onFailure={onFailure}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('delayed-failure-vidstack-engine')
+      ).toBeInTheDocument();
+    });
+    const oldVidstackProps = vidstackProps.mock.calls.at(-1)?.[0];
+
+    act(() => oldVidstackProps.onFailure(failure));
+    expect(
+      screen.getByTestId('delayed-failure-artplayer-engine')
+    ).toBeInTheDocument();
+
+    act(() => oldVidstackProps.onFailure(failure));
+    expect(onFailure).not.toHaveBeenCalled();
   });
 
   test('does not fall back for remote Vidstack failures or an initial ArtPlayer failure', async () => {

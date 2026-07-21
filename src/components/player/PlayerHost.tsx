@@ -111,6 +111,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
     const [showFallbackNotice, setShowFallbackNotice] = useState(false);
     const engineRef = useRef<PlayerHandle>(null);
     const fallbackOccurredRef = useRef(false);
+    const fallbackSwitchingRef = useRef(false);
     const initialResolution = useRef({
       onEngineChange,
       resolvePreference,
@@ -163,10 +164,12 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
       if (
         engine === 'vidstack' &&
         failure.kind === 'playback' &&
-        failure.fatal &&
-        !fallbackOccurredRef.current
+        failure.fatal
       ) {
+        if (fallbackOccurredRef.current) return;
+
         fallbackOccurredRef.current = true;
+        fallbackSwitchingRef.current = true;
         const snapshot = engineRef.current?.getSnapshot() ?? EMPTY_SNAPSHOT;
         onSwitchingChange?.(true);
         setFallbackSnapshot(snapshot);
@@ -181,9 +184,6 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
     };
     const handleReady: PlayerEngineProps['onReady'] = (handle) => {
       onReady?.(handle);
-      if (engine === 'artplayer' && fallbackOccurredRef.current) {
-        onSwitchingChange?.(false);
-      }
     };
     const handleCanPlay: NonNullable<PlayerEngineProps['onCanPlay']> = (
       snapshot
@@ -191,11 +191,14 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
       onCanPlay?.(snapshot);
       if (
         engine === 'artplayer' &&
+        fallbackSwitchingRef.current &&
         fallbackSnapshot &&
         fallbackMediaUrl === media.url
       ) {
+        fallbackSwitchingRef.current = false;
         setFallbackSnapshot(undefined);
         setFallbackMediaUrl(undefined);
+        onSwitchingChange?.(false);
       }
     };
 
