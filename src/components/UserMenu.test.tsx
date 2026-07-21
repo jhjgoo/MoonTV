@@ -39,9 +39,7 @@ describe('UserMenu player preference', () => {
     render(<UserMenu />);
     await openSettings();
 
-    fireEvent.click(
-      screen.getByRole('radio', { name: 'Vidstack（实验性）' })
-    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Vidstack（实验性）' }));
 
     expect(localStorage.getItem('preferredPlayer')).toBe('vidstack');
   });
@@ -50,9 +48,7 @@ describe('UserMenu player preference', () => {
     render(<UserMenu />);
     await openSettings();
 
-    fireEvent.click(
-      screen.getByRole('radio', { name: 'Vidstack（实验性）' })
-    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Vidstack（实验性）' }));
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     await waitFor(() =>
