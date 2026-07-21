@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { createRef, forwardRef, useImperativeHandle } from 'react';
 
 import type {
@@ -479,5 +479,160 @@ describe('PlayerHost', () => {
     ).not.toBeInTheDocument();
     expect(onEngineChange).toHaveBeenCalledTimes(1);
     expect(resolvePreference).toHaveBeenCalledTimes(1);
+  });
+
+  test('falls back from a fatal Vidstack playback failure once and restores its exact snapshot', async () => {
+    const snapshot = {
+      currentTime: 48,
+      duration: 120,
+      volume: 0.35,
+      playbackRate: 1.5,
+      paused: false,
+    };
+    const vidstackProps = jest.fn();
+    const artplayerProps = jest.fn();
+    const onEngineChange = jest.fn();
+    const onSwitchingChange = jest.fn();
+    const Vidstack = createFakeEngine(
+      'fallback-vidstack-engine',
+      { ...createFakeHandle(), getSnapshot: () => snapshot },
+      vidstackProps
+    );
+    const ArtPlayer = createFakeEngine(
+      'fallback-artplayer-engine',
+      createFakeHandle(),
+      artplayerProps
+    );
+    localStorage.setItem('preferredPlayer', 'vidstack');
+
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer, vidstack: Vidstack }}
+        resolvePreference={() => 'vidstack'}
+        onEngineChange={onEngineChange}
+        onSwitchingChange={onSwitchingChange}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('fallback-vidstack-engine')
+      ).toBeInTheDocument();
+    });
+
+    act(() => {
+      vidstackProps.mock.calls.at(-1)?.[0].onFailure({
+        kind: 'playback',
+        fatal: true,
+        message: 'Vidstack 播放错误',
+      });
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Vidstack 播放失败，已临时切换到 ArtPlayer'
+    );
+    expect(screen.getByTestId('fallback-artplayer-engine')).toBeInTheDocument();
+    expect(artplayerProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ restoreSnapshot: snapshot })
+    );
+    expect(onSwitchingChange).toHaveBeenNthCalledWith(1, true);
+    expect(onEngineChange).toHaveBeenLastCalledWith(
+      'artplayer',
+      ARTPLAYER_CAPABILITIES
+    );
+    expect(localStorage.getItem('preferredPlayer')).toBe('vidstack');
+
+    act(() =>
+      artplayerProps.mock.calls.at(-1)?.[0].onReady(createFakeHandle())
+    );
+    expect(onSwitchingChange).toHaveBeenNthCalledWith(2, false);
+
+    act(() => {
+      vidstackProps.mock.calls.at(-1)?.[0].onFailure({
+        kind: 'playback',
+        fatal: true,
+        message: 'Vidstack 播放错误',
+      });
+    });
+
+    expect(artplayerProps).toHaveBeenCalledTimes(1);
+    expect(onEngineChange).toHaveBeenCalledTimes(2);
+  });
+
+  test('does not fall back for remote Vidstack failures or an initial ArtPlayer failure', async () => {
+    const vidstackProps = jest.fn();
+    const artplayerProps = jest.fn();
+    const Vidstack = createFakeEngine(
+      'nonfatal-vidstack-engine',
+      createFakeHandle(),
+      vidstackProps
+    );
+    const ArtPlayer = createFakeEngine(
+      'initial-artplayer-engine',
+      createFakeHandle(),
+      artplayerProps
+    );
+    const onFailure = jest.fn();
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer, vidstack: Vidstack }}
+        resolvePreference={() => 'vidstack'}
+        onFailure={onFailure}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('nonfatal-vidstack-engine')
+      ).toBeInTheDocument();
+    });
+    const remoteFailure = {
+      kind: 'remote-playback' as const,
+      fatal: false,
+      message: '远程播放错误',
+    };
+    act(() => vidstackProps.mock.calls.at(-1)?.[0].onFailure(remoteFailure));
+    expect(screen.getByTestId('nonfatal-vidstack-engine')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(onFailure).toHaveBeenCalledWith(remoteFailure);
+  });
+
+  test('does not replace an initially selected ArtPlayer after its fatal failure', async () => {
+    const artplayerProps = jest.fn();
+    const ArtPlayer = createFakeEngine(
+      'initial-artplayer-engine',
+      createFakeHandle(),
+      artplayerProps
+    );
+    const onFailure = jest.fn();
+    render(
+      <PlayerHost
+        media={{ url: 'https://example.com/video.m3u8', title: 'Episode 1' }}
+        urlOverride={null}
+        engines={{ artplayer: ArtPlayer }}
+        resolvePreference={() => 'artplayer'}
+        onFailure={onFailure}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('initial-artplayer-engine')
+      ).toBeInTheDocument();
+    });
+    const failure = {
+      kind: 'playback' as const,
+      fatal: true,
+      message: '播放器初始化失败',
+    };
+    act(() => artplayerProps.mock.calls.at(-1)?.[0].onFailure(failure));
+
+    expect(screen.getByTestId('initial-artplayer-engine')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(onFailure).toHaveBeenCalledWith(failure);
   });
 });

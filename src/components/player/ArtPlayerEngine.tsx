@@ -373,7 +373,9 @@ export const ArtPlayerEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
             }
             if (time > 0) engine.currentTime = time;
             engine.volume = restore.volume;
-            if (isWebkit) engine.playbackRate = restore.playbackRate;
+            engine.playbackRate = restore.playbackRate;
+            if (restore.paused) engine.pause();
+            else void engine.play();
           }
           restoredMediaUrlRef.current = mediaUrl;
           preservedSnapshotRef.current = undefined;

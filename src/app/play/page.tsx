@@ -179,6 +179,7 @@ function PlayPageClient() {
   // 播放进度保存相关
   const saveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
+  const isEngineSwitchingRef = useRef(false);
 
   const playerRef = useRef<PlayerHandle>(null);
 
@@ -1012,6 +1013,8 @@ function PlayPageClient() {
   };
 
   const handlePlayerTimeUpdate = (snapshot: PlayerSnapshot) => {
+    if (isEngineSwitchingRef.current) return;
+
     const now = Date.now();
     let interval = 5000;
     if (process.env.NEXT_PUBLIC_STORAGE_TYPE === 'd1') interval = 10000;
@@ -1027,6 +1030,13 @@ function PlayPageClient() {
     const index = currentEpisodeIndexRef.current;
     if (d?.episodes && index < d.episodes.length - 1) {
       setTimeout(() => setCurrentEpisodeIndex(index + 1), 1000);
+    }
+  };
+
+  const handleEngineSwitchingChange = (switching: boolean) => {
+    isEngineSwitchingRef.current = switching;
+    if (switching) {
+      void saveCurrentPlayProgress();
     }
   };
 
@@ -1323,8 +1333,13 @@ function PlayPageClient() {
                     }}
                     onTimeUpdate={handlePlayerTimeUpdate}
                     onEnded={handlePlayerEnded}
-                    onPause={() => void saveCurrentPlayProgress()}
+                    onPause={() => {
+                      if (!isEngineSwitchingRef.current) {
+                        void saveCurrentPlayProgress();
+                      }
+                    }}
                     onPlay={() => undefined}
+                    onSwitchingChange={handleEngineSwitchingChange}
                     onFailure={(failure) => {
                       if (failure.fatal) setError(failure.message);
                     }}

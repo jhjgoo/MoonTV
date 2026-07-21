@@ -279,6 +279,38 @@ describe('ArtPlayerEngine', () => {
     expect(player.currentTime).toBe(36);
   });
 
+  test('restores time, volume, rate, and paused state from a fallback snapshot', () => {
+    render(
+      <ArtPlayerEngine
+        media={{ url: 'https://example.com/episode.m3u8', title: '第一集' }}
+        restoreSnapshot={{
+          currentTime: 48,
+          duration: 120,
+          volume: 0.35,
+          playbackRate: 1.5,
+          paused: true,
+        }}
+        onReady={jest.fn()}
+        onTimeUpdate={jest.fn()}
+        onEnded={jest.fn()}
+        onPlay={jest.fn()}
+        onPause={jest.fn()}
+        onFailure={jest.fn()}
+      />
+    );
+    const player = mockArtInstances[0];
+
+    act(() => player.emit('video:canplay'));
+
+    expect(player).toMatchObject({
+      currentTime: 48,
+      volume: 0.35,
+      playbackRate: 1.5,
+      paused: true,
+    });
+    expect(player.pause).toHaveBeenCalledTimes(1);
+  });
+
   test('restores the latest snapshot when ad filtering recreates the engine on the same URL', () => {
     Object.defineProperty(window, 'webkitConvertPointFromNodeToPage', {
       configurable: true,

@@ -23,14 +23,12 @@ import type {
 import { resolvePlayerPreference } from './player-preference';
 import { VidstackEngine } from './VidstackEngine';
 
-const noopReady: PlayerEngineProps['onReady'] = () => undefined;
 const noopCanPlay: NonNullable<PlayerEngineProps['onCanPlay']> = () =>
   undefined;
 const noopTimeUpdate: PlayerEngineProps['onTimeUpdate'] = () => undefined;
 const noopEnded: PlayerEngineProps['onEnded'] = () => undefined;
 const noopPlay: PlayerEngineProps['onPlay'] = () => undefined;
 const noopPause: PlayerEngineProps['onPause'] = () => undefined;
-const noopFailure: PlayerEngineProps['onFailure'] = () => undefined;
 const EMPTY_SNAPSHOT: PlayerSnapshot = {
   currentTime: 0,
   duration: 0,
@@ -81,6 +79,7 @@ export interface PlayerHostProps {
     engine: PlayerEngine,
     capabilities: PlayerCapabilities
   ) => void;
+  onSwitchingChange?: (switching: boolean) => void;
   engines?: Partial<Record<PlayerEngine, PlayerEngineComponent>>;
   resolvePreference?: (
     urlOverride: string | null
@@ -101,6 +100,7 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
       onPlay,
       onReady,
       onTimeUpdate,
+      onSwitchingChange,
       resolvePreference = resolvePlayerPreference,
       restoreSnapshot,
       urlOverride,
@@ -108,7 +108,10 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
     ref
   ) {
     const [engine, setEngine] = useState<PlayerEngine | null>(null);
+    const [fallbackSnapshot, setFallbackSnapshot] = useState<PlayerSnapshot>();
+    const [showFallbackNotice, setShowFallbackNotice] = useState(false);
     const engineRef = useRef<PlayerHandle>(null);
+    const fallbackOccurredRef = useRef(false);
     const initialResolution = useRef({
       onEngineChange,
       resolvePreference,
@@ -157,21 +160,57 @@ export const PlayerHost = forwardRef<PlayerHandle, PlayerHostProps>(
     }
 
     const Engine = engines?.[engine] ?? DEFAULT_ENGINES[engine];
+    const handleFailure: PlayerEngineProps['onFailure'] = (failure) => {
+      if (
+        engine === 'vidstack' &&
+        failure.kind === 'playback' &&
+        failure.fatal &&
+        !fallbackOccurredRef.current
+      ) {
+        fallbackOccurredRef.current = true;
+        const snapshot = engineRef.current?.getSnapshot() ?? EMPTY_SNAPSHOT;
+        onSwitchingChange?.(true);
+        setFallbackSnapshot(snapshot);
+        setShowFallbackNotice(true);
+        setEngine('artplayer');
+        onEngineChange?.('artplayer', ARTPLAYER_CAPABILITIES);
+        return;
+      }
+
+      onFailure?.(failure);
+    };
+    const handleReady: PlayerEngineProps['onReady'] = (handle) => {
+      onReady?.(handle);
+      if (engine === 'artplayer' && fallbackOccurredRef.current) {
+        onSwitchingChange?.(false);
+      }
+    };
 
     return (
-      <Engine
-        ref={engineRef}
-        enhancements={enhancements}
-        media={media}
-        restoreSnapshot={restoreSnapshot}
-        onEnded={onEnded ?? noopEnded}
-        onCanPlay={onCanPlay ?? noopCanPlay}
-        onFailure={onFailure ?? noopFailure}
-        onPause={onPause ?? noopPause}
-        onPlay={onPlay ?? noopPlay}
-        onReady={onReady ?? noopReady}
-        onTimeUpdate={onTimeUpdate ?? noopTimeUpdate}
-      />
+      <>
+        {showFallbackNotice && (
+          <div aria-live='polite' role='status'>
+            Vidstack 播放失败，已临时切换到 ArtPlayer
+          </div>
+        )}
+        <Engine
+          ref={engineRef}
+          enhancements={enhancements}
+          media={media}
+          restoreSnapshot={
+            engine === 'artplayer' && fallbackSnapshot
+              ? fallbackSnapshot
+              : restoreSnapshot
+          }
+          onEnded={onEnded ?? noopEnded}
+          onCanPlay={onCanPlay ?? noopCanPlay}
+          onFailure={handleFailure}
+          onPause={onPause ?? noopPause}
+          onPlay={onPlay ?? noopPlay}
+          onReady={handleReady}
+          onTimeUpdate={onTimeUpdate ?? noopTimeUpdate}
+        />
+      </>
     );
   }
 );

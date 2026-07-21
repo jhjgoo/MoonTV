@@ -391,4 +391,77 @@ describe('VidstackEngine', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
     expect(fatalError).toBe('provider failed');
   });
+
+  test('reports one fatal local failure when a media URL cannot play within twenty seconds', () => {
+    jest.useFakeTimers();
+    const onFailure = jest.fn();
+    render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
+
+    act(() => jest.advanceTimersByTime(20_000));
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure).toHaveBeenCalledWith({
+      kind: 'playback',
+      fatal: true,
+      message: 'Vidstack 在 20 秒内未进入可播放状态',
+    });
+    act(() => jest.advanceTimersByTime(20_000));
+    expect(onFailure).toHaveBeenCalledTimes(1);
+  });
+
+  test('clears the can-play watchdog after canplay and restarts it for a new media URL', () => {
+    jest.useFakeTimers();
+    const onFailure = jest.fn();
+    const view = render(
+      <VidstackEngine {...defaultProps} onFailure={onFailure} />
+    );
+
+    act(() => mediaPlayerProps.onCanPlay());
+    act(() => jest.advanceTimersByTime(20_000));
+    expect(onFailure).not.toHaveBeenCalled();
+
+    view.rerender(
+      <VidstackEngine
+        {...defaultProps}
+        media={{ ...defaultProps.media, url: 'https://example.com/next.m3u8' }}
+        onFailure={onFailure}
+      />
+    );
+    act(() => jest.advanceTimersByTime(20_000));
+    expect(onFailure).toHaveBeenCalledWith({
+      kind: 'playback',
+      fatal: true,
+      message: 'Vidstack 在 20 秒内未进入可播放状态',
+    });
+  });
+
+  test('clears the can-play watchdog after a remote playback failure', () => {
+    jest.useFakeTimers();
+    const onFailure = jest.fn();
+    render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
+
+    act(() => {
+      dispatchPlayerEvent(
+        createPlayerEvent('google-cast-prompt-error', new Error('cancelled'))
+      );
+    });
+    act(() => jest.advanceTimersByTime(20_000));
+
+    expect(onFailure).toHaveBeenCalledTimes(1);
+    expect(onFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'remote-playback', fatal: false })
+    );
+  });
+
+  test('cleans up the can-play watchdog on unmount', () => {
+    jest.useFakeTimers();
+    const onFailure = jest.fn();
+    const { unmount } = render(
+      <VidstackEngine {...defaultProps} onFailure={onFailure} />
+    );
+
+    unmount();
+    act(() => jest.advanceTimersByTime(20_000));
+    expect(onFailure).not.toHaveBeenCalled();
+  });
 });

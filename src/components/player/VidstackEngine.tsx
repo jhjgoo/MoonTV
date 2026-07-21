@@ -10,6 +10,7 @@ import {
   type RefAttributes,
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
 } from 'react';
@@ -134,7 +135,38 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
     const playerRef = useRef<MediaPlayerInstance | null>(null);
     const propsRef = useRef(props);
     const restoredUrlRef = useRef<string | null>(null);
+    const canPlayWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(
+      null
+    );
+    const watchdogFailedRef = useRef(false);
     propsRef.current = props;
+
+    const clearCanPlayWatchdog = useCallback(() => {
+      if (canPlayWatchdogRef.current !== null) {
+        clearTimeout(canPlayWatchdogRef.current);
+        canPlayWatchdogRef.current = null;
+      }
+    }, []);
+
+    useEffect(() => {
+      clearCanPlayWatchdog();
+      watchdogFailedRef.current = false;
+      canPlayWatchdogRef.current = setTimeout(() => {
+        canPlayWatchdogRef.current = null;
+        if (watchdogFailedRef.current) return;
+
+        watchdogFailedRef.current = true;
+        propsRef.current.onFailure({
+          kind: 'playback',
+          fatal: true,
+          message: 'Vidstack 在 20 秒内未进入可播放状态',
+        });
+      }, 20_000);
+
+      return () => {
+        clearCanPlayWatchdog();
+      };
+    }, [clearCanPlayWatchdog, props.media.url]);
 
     const handleRef = useRef<PlayerHandle>({
       getSnapshot: () => snapshotFor(playerRef.current),
@@ -170,6 +202,8 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
       const currentProps = propsRef.current;
       if (!player) return;
 
+      clearCanPlayWatchdog();
+
       if (restoredUrlRef.current !== currentProps.media.url) {
         const restore =
           currentProps.restoreSnapshot ??
@@ -192,6 +226,7 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
     };
 
     const handleError = (cause: unknown) => {
+      clearCanPlayWatchdog();
       const remotePlaybackType = playerRef.current?.remotePlaybackType;
       const remotePlaybackState = playerRef.current?.remotePlaybackState;
       if (
@@ -216,35 +251,43 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
       });
     };
 
-    const handleGoogleCastPromptError = useCallback((event: Event) => {
-      const detail = eventDetail(event);
-      const cause = detail !== undefined ? detail : event;
-      propsRef.current.onFailure({
-        kind: 'remote-playback',
-        fatal: false,
-        message: 'Google Cast 投屏失败',
-        cause,
-      });
-    }, []);
+    const handleGoogleCastPromptError = useCallback(
+      (event: Event) => {
+        clearCanPlayWatchdog();
+        const detail = eventDetail(event);
+        const cause = detail !== undefined ? detail : event;
+        propsRef.current.onFailure({
+          kind: 'remote-playback',
+          fatal: false,
+          message: 'Google Cast 投屏失败',
+          cause,
+        });
+      },
+      [clearCanPlayWatchdog]
+    );
 
-    const handleRemotePlaybackChange = useCallback((event: Event) => {
-      const detail = eventDetail(event);
-      if (
-        !detail ||
-        typeof detail !== 'object' ||
-        (detail as { state?: string }).state !== 'disconnected' ||
-        (detail as { type?: string }).type === 'none'
-      ) {
-        return;
-      }
+    const handleRemotePlaybackChange = useCallback(
+      (event: Event) => {
+        const detail = eventDetail(event);
+        if (
+          !detail ||
+          typeof detail !== 'object' ||
+          (detail as { state?: string }).state !== 'disconnected' ||
+          (detail as { type?: string }).type === 'none'
+        ) {
+          return;
+        }
 
-      propsRef.current.onFailure({
-        kind: 'remote-playback',
-        fatal: false,
-        message: '远程播放已断开',
-        cause: detail,
-      });
-    }, []);
+        clearCanPlayWatchdog();
+        propsRef.current.onFailure({
+          kind: 'remote-playback',
+          fatal: false,
+          message: '远程播放已断开',
+          cause: detail,
+        });
+      },
+      [clearCanPlayWatchdog]
+    );
 
     const setPlayerRef = useCallback(
       (player: MediaPlayerInstance | null) => {

@@ -4,10 +4,13 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
+import { savePlayRecord } from '@/lib/db.client';
+
 import type {
   PlayerEngineProps,
   PlayerHandle,
 } from '@/components/player/player.types';
+import type { PlayerHostProps } from '@/components/player/PlayerHost';
 
 const mockPlayerHandle: PlayerHandle = {
   getSnapshot: jest.fn(() => ({
@@ -24,7 +27,8 @@ const mockPlayerHandle: PlayerHandle = {
   setPlaybackRate: jest.fn(),
   toggleFullscreen: jest.fn(),
 };
-let mockPlayerProps: PlayerEngineProps & { urlOverride: string | null };
+let mockPlayerProps: PlayerEngineProps &
+  Pick<PlayerHostProps, 'urlOverride' | 'onSwitchingChange'>;
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn() }),
@@ -168,5 +172,49 @@ describe('PlayPage player boundary', () => {
       (mockPlayerProps as any).onCanPlay();
     });
     expect(screen.queryByText('🔄 切换播放源...')).not.toBeInTheDocument();
+  });
+
+  test('persists the final snapshot once during an engine switch and ignores internal teardown events', async () => {
+    jest.useFakeTimers();
+    jest.mocked(mockPlayerHandle.getSnapshot).mockReturnValue({
+      currentTime: 48,
+      duration: 120,
+      volume: 0.35,
+      playbackRate: 1.5,
+      paused: false,
+    });
+    render(<PlayPage />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => jest.advanceTimersByTime(1000));
+    const snapshot = mockPlayerHandle.getSnapshot();
+
+    await act(async () => {
+      mockPlayerProps.onSwitchingChange?.(true);
+      await Promise.resolve();
+    });
+    expect(savePlayRecord).toHaveBeenCalledTimes(1);
+    expect(savePlayRecord).toHaveBeenLastCalledWith(
+      'source-1',
+      'one',
+      expect.objectContaining({ play_time: 48, total_time: 120 })
+    );
+
+    act(() => {
+      mockPlayerProps.onPause(snapshot);
+      mockPlayerProps.onTimeUpdate(snapshot);
+    });
+    expect(savePlayRecord).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      mockPlayerProps.onReady(mockPlayerHandle);
+      mockPlayerProps.onSwitchingChange?.(false);
+      mockPlayerProps.onPause(snapshot);
+      await Promise.resolve();
+    });
+    expect(savePlayRecord).toHaveBeenCalledTimes(2);
   });
 });
