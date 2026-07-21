@@ -3,7 +3,7 @@
 
 import { ChevronUp, Search, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   addSearchHistory,
@@ -12,6 +12,10 @@ import {
   getSearchHistory,
   subscribeToDataUpdates,
 } from '@/lib/db.client';
+import {
+  fetchAllSearchResults,
+  shouldFetchSearchImmediately,
+} from '@/lib/search.client';
 import { SearchResult } from '@/lib/types';
 
 import PageLayout from '@/components/PageLayout';
@@ -29,6 +33,7 @@ function SearchPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const searchRequestRef = useRef<AbortController | null>(null);
 
   // 获取默认聚合设置：只读取用户本地设置，默认为 true
   const getDefaultAggregate = () => {
@@ -159,14 +164,16 @@ function SearchPageClient() {
   }, [searchParams]);
 
   const fetchSearchResults = async (query: string) => {
+    searchRequestRef.current?.abort();
+    const controller = new AbortController();
+    searchRequestRef.current = controller;
     try {
       setIsLoading(true);
-      const response = await fetch(
-        `/api/search?q=${encodeURIComponent(query.trim())}`,
-        { cache: 'no-store' }
+      const results = await fetchAllSearchResults(
+        query,
+        fetch,
+        controller.signal
       );
-      const data = await response.json();
-      const results = data.results;
       setSearchResults(
         results.sort((a: SearchResult, b: SearchResult) => {
           // 优先排序：标题与搜索词完全一致的排在前面
@@ -196,9 +203,12 @@ function SearchPageClient() {
       );
       setShowResults(true);
     } catch (error) {
+      if (controller.signal.aborted) return;
       setSearchResults([]);
     } finally {
-      setIsLoading(false);
+      if (searchRequestRef.current === controller) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -212,12 +222,12 @@ function SearchPageClient() {
     setIsLoading(true);
     setShowResults(true);
 
-    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
-    // 直接发请求
-    fetchSearchResults(trimmed);
-
-    // 保存到搜索历史 (事件监听会自动更新界面)
-    addSearchHistory(trimmed);
+    if (shouldFetchSearchImmediately(searchParams.get('q'), trimmed)) {
+      fetchSearchResults(trimmed);
+      addSearchHistory(trimmed);
+    } else {
+      router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    }
   };
 
   // 返回顶部功能

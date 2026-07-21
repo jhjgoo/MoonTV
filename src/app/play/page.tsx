@@ -21,6 +21,7 @@ import {
   saveSkipConfig,
   subscribeToDataUpdates,
 } from '@/lib/db.client';
+import { fetchAllSearchResults } from '@/lib/search.client';
 import { SearchResult } from '@/lib/types';
 import { getVideoResolutionFromM3u8, processImageUrl } from '@/lib/utils';
 
@@ -619,16 +620,10 @@ function PlayPageClient() {
     const fetchSourcesData = async (query: string): Promise<SearchResult[]> => {
       // 根据搜索词获取全部源信息
       try {
-        const response = await fetch(
-          `/api/search?q=${encodeURIComponent(query.trim())}`
-        );
-        if (!response.ok) {
-          throw new Error('搜索失败');
-        }
-        const data = await response.json();
+        const searchResults = await fetchAllSearchResults(query);
 
         // 处理搜索结果，根据规则过滤
-        const results = data.results.filter(
+        const results = searchResults.filter(
           (result: SearchResult) =>
             result.title.replaceAll(' ', '').toLowerCase() ===
               videoTitleRef.current.replaceAll(' ', '').toLowerCase() &&

@@ -17,7 +17,8 @@ interface ApiSearchItem {
 
 export async function searchFromApi(
   apiSite: ApiSite,
-  query: string
+  query: string,
+  maxSearchPages?: number
 ): Promise<SearchResult[]> {
   try {
     const apiBaseUrl = apiSite.api;
@@ -90,8 +91,8 @@ export async function searchFromApi(
       };
     });
 
-    const config = await getConfig();
-    const MAX_SEARCH_PAGES: number = config.SiteConfig.SearchDownstreamMaxPage;
+    const MAX_SEARCH_PAGES: number =
+      maxSearchPages ?? (await getConfig()).SiteConfig.SearchDownstreamMaxPage;
 
     // 获取总页数
     const pageCount = data.pagecount || 1;
