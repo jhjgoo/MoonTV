@@ -44,11 +44,13 @@ interface MediaPlayerInstance {
   volume: number;
   playbackRate: number;
   paused: boolean;
-  remotePlaybackType?: string;
-  remotePlaybackState?: string;
   addEventListener(type: string, listener: EventListener): void;
   removeEventListener(type: string, listener: EventListener): void;
-  state?: { fullscreen?: boolean };
+  state?: {
+    fullscreen?: boolean;
+    remotePlaybackType?: string;
+    remotePlaybackState?: string;
+  };
   play(): Promise<void>;
   pause(): Promise<void>;
   enterFullscreen(): Promise<void>;
@@ -226,9 +228,8 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
     };
 
     const handleError = (cause: unknown) => {
-      clearCanPlayWatchdog();
-      const remotePlaybackType = playerRef.current?.remotePlaybackType;
-      const remotePlaybackState = playerRef.current?.remotePlaybackState;
+      const remotePlaybackType = playerRef.current?.state?.remotePlaybackType;
+      const remotePlaybackState = playerRef.current?.state?.remotePlaybackState;
       if (
         remotePlaybackType &&
         remotePlaybackType !== 'none' &&
@@ -243,6 +244,7 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
         return;
       }
 
+      clearCanPlayWatchdog();
       propsRef.current.onFailure({
         kind: 'playback',
         fatal: true,
@@ -251,43 +253,35 @@ export const VidstackEngine = forwardRef<PlayerHandle, PlayerEngineProps>(
       });
     };
 
-    const handleGoogleCastPromptError = useCallback(
-      (event: Event) => {
-        clearCanPlayWatchdog();
-        const detail = eventDetail(event);
-        const cause = detail !== undefined ? detail : event;
-        propsRef.current.onFailure({
-          kind: 'remote-playback',
-          fatal: false,
-          message: 'Google Cast 投屏失败',
-          cause,
-        });
-      },
-      [clearCanPlayWatchdog]
-    );
+    const handleGoogleCastPromptError = useCallback((event: Event) => {
+      const detail = eventDetail(event);
+      const cause = detail !== undefined ? detail : event;
+      propsRef.current.onFailure({
+        kind: 'remote-playback',
+        fatal: false,
+        message: 'Google Cast 投屏失败',
+        cause,
+      });
+    }, []);
 
-    const handleRemotePlaybackChange = useCallback(
-      (event: Event) => {
-        const detail = eventDetail(event);
-        if (
-          !detail ||
-          typeof detail !== 'object' ||
-          (detail as { state?: string }).state !== 'disconnected' ||
-          (detail as { type?: string }).type === 'none'
-        ) {
-          return;
-        }
+    const handleRemotePlaybackChange = useCallback((event: Event) => {
+      const detail = eventDetail(event);
+      if (
+        !detail ||
+        typeof detail !== 'object' ||
+        (detail as { state?: string }).state !== 'disconnected' ||
+        (detail as { type?: string }).type === 'none'
+      ) {
+        return;
+      }
 
-        clearCanPlayWatchdog();
-        propsRef.current.onFailure({
-          kind: 'remote-playback',
-          fatal: false,
-          message: '远程播放已断开',
-          cause: detail,
-        });
-      },
-      [clearCanPlayWatchdog]
-    );
+      propsRef.current.onFailure({
+        kind: 'remote-playback',
+        fatal: false,
+        message: '远程播放已断开',
+        cause: detail,
+      });
+    }, []);
 
     const setPlayerRef = useCallback(
       (player: MediaPlayerInstance | null) => {

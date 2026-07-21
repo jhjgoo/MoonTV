@@ -13,8 +13,10 @@ const player = {
   volume: 0.7,
   playbackRate: 1,
   paused: false,
-  remotePlaybackType: 'none',
-  remotePlaybackState: 'disconnected',
+  state: {
+    remotePlaybackType: 'none',
+    remotePlaybackState: 'disconnected',
+  },
   play: jest.fn(async () => undefined),
   pause: jest.fn(async () => undefined),
   enterFullscreen: jest.fn(async () => undefined),
@@ -109,8 +111,8 @@ describe('VidstackEngine', () => {
     player.volume = 0.7;
     player.playbackRate = 1;
     player.paused = false;
-    player.remotePlaybackType = 'none';
-    player.remotePlaybackState = 'disconnected';
+    player.state.remotePlaybackType = 'none';
+    player.state.remotePlaybackState = 'disconnected';
     player.play.mockClear();
     player.pause.mockClear();
     player.enterFullscreen.mockClear();
@@ -278,8 +280,8 @@ describe('VidstackEngine', () => {
   test('reports generic errors during active remote playback without unmounting', () => {
     const onFailure = jest.fn();
     render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
-    player.remotePlaybackType = 'google-cast';
-    player.remotePlaybackState = 'connected';
+    player.state.remotePlaybackType = 'google-cast';
+    player.state.remotePlaybackState = 'connected';
     const cause = new Error('receiver load failed');
 
     act(() => mediaPlayerProps.onError(cause));
@@ -297,8 +299,8 @@ describe('VidstackEngine', () => {
   test('reports provider errors after remote disconnect as fatal local playback failures', () => {
     const onFailure = jest.fn();
     render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
-    player.remotePlaybackType = 'google-cast';
-    player.remotePlaybackState = 'disconnected';
+    player.state.remotePlaybackType = 'google-cast';
+    player.state.remotePlaybackState = 'disconnected';
     const cause = new Error('local provider failed after disconnect');
 
     act(() => mediaPlayerProps.onError(cause));
@@ -435,7 +437,7 @@ describe('VidstackEngine', () => {
     });
   });
 
-  test('clears the can-play watchdog after a remote playback failure', () => {
+  test('keeps the can-play watchdog running after a cancelled Cast prompt', () => {
     jest.useFakeTimers();
     const onFailure = jest.fn();
     render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
@@ -447,10 +449,41 @@ describe('VidstackEngine', () => {
     });
     act(() => jest.advanceTimersByTime(20_000));
 
-    expect(onFailure).toHaveBeenCalledTimes(1);
-    expect(onFailure).toHaveBeenCalledWith(
+    expect(onFailure).toHaveBeenCalledTimes(2);
+    expect(onFailure).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({ kind: 'remote-playback', fatal: false })
     );
+    expect(onFailure).toHaveBeenNthCalledWith(2, {
+      kind: 'playback',
+      fatal: true,
+      message: 'Vidstack 在 20 秒内未进入可播放状态',
+    });
+  });
+
+  test('keeps the can-play watchdog running after a remote disconnect', () => {
+    jest.useFakeTimers();
+    const onFailure = jest.fn();
+    render(<VidstackEngine {...defaultProps} onFailure={onFailure} />);
+    const detail = { type: 'google-cast', state: 'disconnected' };
+
+    act(() => {
+      dispatchPlayerEvent(createPlayerEvent('remote-playback-change', detail));
+    });
+    act(() => jest.advanceTimersByTime(20_000));
+
+    expect(onFailure).toHaveBeenCalledTimes(2);
+    expect(onFailure).toHaveBeenNthCalledWith(1, {
+      kind: 'remote-playback',
+      fatal: false,
+      message: '远程播放已断开',
+      cause: detail,
+    });
+    expect(onFailure).toHaveBeenNthCalledWith(2, {
+      kind: 'playback',
+      fatal: true,
+      message: 'Vidstack 在 20 秒内未进入可播放状态',
+    });
   });
 
   test('cleans up the can-play watchdog on unmount', () => {
