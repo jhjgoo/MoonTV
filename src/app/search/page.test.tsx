@@ -128,4 +128,20 @@ describe('SearchPage progressive loading', () => {
 
     expect(await screen.findByText('未找到相关结果')).toBeInTheDocument();
   });
+
+  test('does not report no results when an unresolved batch failed', async () => {
+    mockUseProgressiveSearch.mockReturnValue(
+      state({
+        results: [],
+        status: 'exhausted',
+        hasMore: false,
+        failedPages: [0],
+      })
+    );
+
+    render(<SearchPage />);
+
+    expect(await screen.findByText('部分视频源加载失败')).toBeInTheDocument();
+    expect(screen.queryByText('未找到相关结果')).not.toBeInTheDocument();
+  });
 });

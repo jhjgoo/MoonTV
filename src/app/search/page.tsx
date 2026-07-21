@@ -336,7 +336,8 @@ function SearchPageClient() {
                       </div>
                     ))}
                 {progressiveSearch.status === 'exhausted' &&
-                  searchResults.length === 0 && (
+                  searchResults.length === 0 &&
+                  progressiveSearch.failedPages.length === 0 && (
                     <div className='col-span-full text-center text-gray-500 py-8 dark:text-gray-400'>
                       未找到相关结果
                     </div>
