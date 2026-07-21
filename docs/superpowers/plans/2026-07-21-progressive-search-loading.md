@@ -1,5 +1,7 @@
 # Progressive Search Loading Implementation Plan
 
+**执行状态：** 已完成（2026-07-21）
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让搜索页在第一批结果返回后立即展示，并在首屏不足或用户滚动到底部时逐批加载剩余视频源。
@@ -27,7 +29,7 @@
 - Modify: `src/lib/search.client.ts`
 - Modify: `src/lib/search.client.test.ts`
 
-- [ ] **Step 1: 写单批请求失败测试**
+- [x] **Step 1: 写单批请求失败测试**
 
 在 `src/lib/search.client.test.ts` 中导入 `fetchSearchBatch`，新增：
 
@@ -60,13 +62,13 @@ test('rejects malformed batch responses', async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/lib/search.client.test.ts`
 
 Expected: FAIL，因为 `fetchSearchBatch` 尚未导出且未校验响应。
 
-- [ ] **Step 3: 实现单批请求函数**
+- [x] **Step 3: 实现单批请求函数**
 
 在 `src/lib/search.client.ts` 中导出响应类型和函数：
 
@@ -102,13 +104,13 @@ export async function fetchSearchBatch(
 
 让 `fetchAllSearchResults()` 继续复用该函数，保持播放页行为不变。
 
-- [ ] **Step 4: 运行测试并确认 GREEN**
+- [x] **Step 4: 运行测试并确认 GREEN**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/lib/search.client.test.ts`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 rtk git add src/lib/search.client.ts src/lib/search.client.test.ts
@@ -122,7 +124,7 @@ rtk git commit -m "refactor(搜索): 导出单批搜索请求"
 - Create: `src/hooks/useProgressiveSearch.ts`
 - Create: `src/hooks/useProgressiveSearch.test.tsx`
 
-- [ ] **Step 1: 写首批即时返回和单请求锁测试**
+- [x] **Step 1: 写首批即时返回和单请求锁测试**
 
 测试使用 `renderHook`、`act` 和可控 Promise，约定 Hook 接口：
 
@@ -146,13 +148,13 @@ expect(fetchBatch).toHaveBeenCalledTimes(2); // 第 0 批 + 唯一的第 1 批
 
 同时新增连续空批次测试：第 0 批和第 1 批均为空时，`nextPage` 必须依次推进，且 `hasMore` 保持正确。
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/hooks/useProgressiveSearch.test.tsx`
 
 Expected: FAIL，因为 Hook 文件不存在。
 
-- [ ] **Step 3: 实现基础状态机**
+- [x] **Step 3: 实现基础状态机**
 
 导出以下类型和接口：
 
@@ -186,7 +188,7 @@ export interface ProgressiveSearchState {
 - 成功或失败都推进 `nextPage`，避免空批次和坏批次卡住。
 - 只有当前查询版本的响应可以写入状态。
 
-- [ ] **Step 4: 写排序、去重和查询取消测试**
+- [x] **Step 4: 写排序、去重和查询取消测试**
 
 覆盖：
 
@@ -201,13 +203,13 @@ expect(
 
 重新渲染为新查询词后，断言旧 `AbortSignal.aborted === true`，随后完成旧 Promise，结果仍不得写入新查询。
 
-- [ ] **Step 5: 运行新增测试并确认 RED**
+- [x] **Step 5: 运行新增测试并确认 RED**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/hooks/useProgressiveSearch.test.tsx`
 
 Expected: 新增排序、去重和取消测试 FAIL。
 
-- [ ] **Step 6: 实现混合排序和去重**
+- [x] **Step 6: 实现混合排序和去重**
 
 新增纯函数：
 
@@ -225,17 +227,17 @@ export function mergeSearchResults(
 - `append` 模式只排序新批次，再追加到已有结果。
 - 排序规则与当前搜索页一致：标题完全匹配优先、年份降序、同年按标题排序、`unknown` 最后。
 
-- [ ] **Step 7: 写失败重试测试**
+- [x] **Step 7: 写失败重试测试**
 
 覆盖首次失败后自动重试、第二次失败后加入 `failedPages` 并推进下一页，以及 `retryFailed()` 按页码顺序重试并合并成功结果。
 
-- [ ] **Step 8: 运行失败重试测试并确认 RED**
+- [x] **Step 8: 运行失败重试测试并确认 RED**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/hooks/useProgressiveSearch.test.tsx`
 
 Expected: FAIL，因为失败页逻辑尚未实现。
 
-- [ ] **Step 9: 实现失败重试并运行 GREEN**
+- [x] **Step 9: 实现失败重试并运行 GREEN**
 
 每页最多尝试 2 次。两次失败后记录页码并继续。`retryFailed()` 同一时间只处理 1 个失败页，成功后从集合中删除。
 
@@ -243,7 +245,7 @@ Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/hooks/useProgressiveSe
 
 Expected: PASS。
 
-- [ ] **Step 10: 提交**
+- [x] **Step 10: 提交**
 
 ```bash
 rtk git add src/hooks/useProgressiveSearch.ts src/hooks/useProgressiveSearch.test.tsx
@@ -257,7 +259,7 @@ rtk git commit -m "feat(搜索): 添加渐进搜索状态机"
 - Create: `src/components/search/SearchLoadFooter.tsx`
 - Create: `src/components/search/SearchLoadFooter.test.tsx`
 
-- [ ] **Step 1: 写 UI 状态测试**
+- [x] **Step 1: 写 UI 状态测试**
 
 覆盖：
 
@@ -268,13 +270,13 @@ rtk git commit -m "feat(搜索): 添加渐进搜索状态机"
 
 按钮测试必须断言 `onLoadMore`、`onRetryFailed` 各调用 1 次。
 
-- [ ] **Step 2: 运行测试并确认 RED**
+- [x] **Step 2: 运行测试并确认 RED**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/components/search/SearchLoadFooter.test.tsx`
 
 Expected: FAIL，因为组件不存在。
 
-- [ ] **Step 3: 实现组件**
+- [x] **Step 3: 实现组件**
 
 组件接口固定为：
 
@@ -292,13 +294,13 @@ interface SearchLoadFooterProps {
 
 组件只负责状态展示和按钮事件，不直接发请求。
 
-- [ ] **Step 4: 运行测试并确认 GREEN**
+- [x] **Step 4: 运行测试并确认 GREEN**
 
 Run: `rtk pnpm exec jest --runInBand --runTestsByPath src/components/search/SearchLoadFooter.test.tsx`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 rtk git add src/components/search/SearchLoadFooter.tsx src/components/search/SearchLoadFooter.test.tsx
@@ -313,7 +315,7 @@ rtk git commit -m "feat(搜索): 添加渐进加载状态反馈"
 - Test: `src/hooks/useProgressiveSearch.test.tsx`
 - Test: `src/components/search/SearchLoadFooter.test.tsx`
 
-- [ ] **Step 1: 用渐进 Hook 替换全量搜索状态**
+- [x] **Step 1: 用渐进 Hook 替换全量搜索状态**
 
 删除搜索页中的 `fetchAllSearchResults`、`isLoading`、`searchRequestRef` 和本地全量排序逻辑，改为：
 
@@ -326,7 +328,7 @@ const isInitialLoading = progressive.status === 'initial-loading';
 
 保留同查询词重复提交能力，通过 Hook 的 `restart()` 重新开始，避免依赖页面内部请求函数。
 
-- [ ] **Step 2: 接入 `IntersectionObserver`**
+- [x] **Step 2: 接入 `IntersectionObserver`**
 
 新增 `sentinelRef`、`sentinelVisible` 和 `hasFilledViewportRef`：
 
@@ -349,7 +351,7 @@ useEffect(() => {
 
 新增独立 effect：哨兵可见、仍有下一批且未加载时，调用 `loadNext(hasFilledViewportRef.current ? 'append' : 'auto')`。依赖 `nextPage` 和加载状态，确保连续空批次完成后仍能再次推进。
 
-- [ ] **Step 3: 接入页面反馈**
+- [x] **Step 3: 接入页面反馈**
 
 - 仅 `initial-loading` 使用中央加载动画。
 - 第 0 批完成后立即渲染结果区。
@@ -357,7 +359,7 @@ useEffect(() => {
 - 在结果网格后渲染哨兵和 `SearchLoadFooter`。
 - 查询词变化时重置 `hasFilledViewportRef`。
 
-- [ ] **Step 4: 运行定向测试**
+- [x] **Step 4: 运行定向测试**
 
 Run:
 
@@ -373,7 +375,7 @@ rtk pnpm exec jest --runInBand --runTestsByPath \
 
 Expected: PASS，0 failures。
 
-- [ ] **Step 5: 静态检查与 Cloudflare 构建**
+- [x] **Step 5: 静态检查与 Cloudflare 构建**
 
 Run:
 
@@ -392,7 +394,7 @@ rtk pnpm pages:build
 
 Expected: 格式和 diff 检查通过；Cloudflare Pages 构建成功。仓库既有、与本次无关的 warning 单独记录。
 
-- [ ] **Step 6: 本地运行时验收**
+- [x] **Step 6: 本地运行时验收**
 
 重建 `moontv-subscription-acceptance` 容器并验证：
 
@@ -402,7 +404,7 @@ Expected: 格式和 diff 检查通过；Cloudflare Pages 构建成功。仓库�
 - 开启成人权限的管理员能在后续批次看到成人源。
 - 关闭成人权限的用户搜索成人关键词仍为 0 条。
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 rtk git add src/app/search/page.tsx
@@ -415,17 +417,17 @@ rtk git commit -m "feat(搜索): 支持滚动渐进加载结果"
 
 - Review: all changes since `b5a83bc`
 
-- [ ] **Step 1: 按规格逐项审查**
+- [x] **Step 1: 按规格逐项审查**
 
 确认首批即时展示、首屏自动补足、滚动追加、失败重试、播放页不变和成人权限边界均有实现与测试证据。
 
-- [ ] **Step 2: 运行最终验证**
+- [x] **Step 2: 运行最终验证**
 
 Run: Task 4 的完整定向测试、Prettier、`git diff --check` 和 `rtk pnpm pages:build`。
 
 Expected: 所有定向测试通过，构建成功。
 
-- [ ] **Step 3: 检查提交历史和工作区**
+- [x] **Step 3: 检查提交历史和工作区**
 
 Run:
 
