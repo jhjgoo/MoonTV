@@ -12,13 +12,12 @@ import {
   getSearchHistory,
   subscribeToDataUpdates,
 } from '@/lib/db.client';
-import {
-  fetchAllSearchResults,
-  shouldFetchSearchImmediately,
-} from '@/lib/search.client';
+import { shouldFetchSearchImmediately } from '@/lib/search.client';
 import { SearchResult } from '@/lib/types';
+import { useProgressiveSearch } from '@/hooks/useProgressiveSearch';
 
 import PageLayout from '@/components/PageLayout';
+import SearchLoadFooter from '@/components/search/SearchLoadFooter';
 import VideoCard from '@/components/VideoCard';
 
 function SearchPageClient() {
@@ -29,11 +28,16 @@ function SearchPageClient() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const activeQuery = searchParams.get('q') || '';
+  const progressiveSearch = useProgressiveSearch(activeQuery);
+  const searchResults = progressiveSearch.results;
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const searchRequestRef = useRef<AbortController | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const hasFilledViewportRef = useRef(false);
+  const [sentinelVisible, setSentinelVisible] = useState(false);
+  const [observerSupported, setObserverSupported] = useState(() =>
+    typeof window !== 'undefined' ? 'IntersectionObserver' in window : false
+  );
 
   // 获取默认聚合设置：只读取用户本地设置，默认为 true
   const getDefaultAggregate = () => {
@@ -94,7 +98,7 @@ function SearchPageClient() {
         }
       }
     });
-  }, [searchResults]);
+  }, [searchQuery, searchResults]);
 
   useEffect(() => {
     // 无搜索参数时聚焦搜索框
@@ -151,66 +155,60 @@ function SearchPageClient() {
 
   useEffect(() => {
     // 当搜索参数变化时更新搜索状态
-    const query = searchParams.get('q');
-    if (query) {
-      setSearchQuery(query);
-      fetchSearchResults(query);
+    if (activeQuery) {
+      setSearchQuery(activeQuery);
 
       // 保存到搜索历史 (事件监听会自动更新界面)
-      addSearchHistory(query);
-    } else {
-      setShowResults(false);
+      addSearchHistory(activeQuery);
     }
-  }, [searchParams]);
+  }, [activeQuery]);
 
-  const fetchSearchResults = async (query: string) => {
-    searchRequestRef.current?.abort();
-    const controller = new AbortController();
-    searchRequestRef.current = controller;
-    try {
-      setIsLoading(true);
-      const results = await fetchAllSearchResults(
-        query,
-        fetch,
-        controller.signal
-      );
-      setSearchResults(
-        results.sort((a: SearchResult, b: SearchResult) => {
-          // 优先排序：标题与搜索词完全一致的排在前面
-          const aExactMatch = a.title === query.trim();
-          const bExactMatch = b.title === query.trim();
+  useEffect(() => {
+    hasFilledViewportRef.current = false;
+    setSentinelVisible(false);
+  }, [activeQuery]);
 
-          if (aExactMatch && !bExactMatch) return -1;
-          if (!aExactMatch && bExactMatch) return 1;
+  useEffect(() => {
+    const supported = 'IntersectionObserver' in window;
+    setObserverSupported(supported);
+    const sentinel = sentinelRef.current;
+    if (!supported || !sentinel) return;
 
-          // 如果都匹配或都不匹配，则按原来的逻辑排序
-          if (a.year === b.year) {
-            return a.title.localeCompare(b.title);
-          } else {
-            // 处理 unknown 的情况
-            if (a.year === 'unknown' && b.year === 'unknown') {
-              return 0;
-            } else if (a.year === 'unknown') {
-              return 1; // a 排在后面
-            } else if (b.year === 'unknown') {
-              return -1; // b 排在后面
-            } else {
-              // 都是数字年份，按数字大小排序（大的在前面）
-              return parseInt(a.year) > parseInt(b.year) ? -1 : 1;
-            }
-          }
-        })
-      );
-      setShowResults(true);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      setSearchResults([]);
-    } finally {
-      if (searchRequestRef.current === controller) {
-        setIsLoading(false);
+    const observer = new window.IntersectionObserver(
+      ([entry]) => {
+        setSentinelVisible(entry.isIntersecting);
+        if (!entry.isIntersecting && searchResults.length > 0) {
+          hasFilledViewportRef.current = true;
+        }
+      },
+      {
+        root: document.body,
+        rootMargin: '0px 0px 200px 0px',
       }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeQuery, progressiveSearch.status, searchResults.length]);
+
+  const isBatchLoading =
+    progressiveSearch.status === 'initial-loading' ||
+    progressiveSearch.status === 'auto-filling' ||
+    progressiveSearch.status === 'loading-more';
+
+  useEffect(() => {
+    if (!sentinelVisible || !progressiveSearch.hasMore || isBatchLoading) {
+      return;
     }
-  };
+    void progressiveSearch.loadNext(
+      hasFilledViewportRef.current ? 'append' : 'auto'
+    );
+  }, [
+    isBatchLoading,
+    progressiveSearch.hasMore,
+    progressiveSearch.loadNext,
+    progressiveSearch.nextPage,
+    sentinelVisible,
+  ]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,11 +217,8 @@ function SearchPageClient() {
 
     // 回显搜索框
     setSearchQuery(trimmed);
-    setIsLoading(true);
-    setShowResults(true);
-
     if (shouldFetchSearchImmediately(searchParams.get('q'), trimmed)) {
-      fetchSearchResults(trimmed);
+      progressiveSearch.restart();
       addSearchHistory(trimmed);
     } else {
       router.push(`/search?q=${encodeURIComponent(trimmed)}`);
@@ -266,11 +261,11 @@ function SearchPageClient() {
 
         {/* 搜索结果或搜索历史 */}
         <div className='max-w-[95%] mx-auto mt-12 overflow-visible'>
-          {isLoading ? (
+          {progressiveSearch.status === 'initial-loading' ? (
             <div className='flex justify-center items-center h-40'>
               <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-green-500'></div>
             </div>
-          ) : showResults ? (
+          ) : activeQuery ? (
             <section className='mb-12'>
               {/* 标题 + 聚合开关 */}
               <div className='mb-8 flex items-center justify-between'>
@@ -340,12 +335,33 @@ function SearchPageClient() {
                         />
                       </div>
                     ))}
-                {searchResults.length === 0 && (
-                  <div className='col-span-full text-center text-gray-500 py-8 dark:text-gray-400'>
-                    未找到相关结果
-                  </div>
-                )}
+                {progressiveSearch.status === 'exhausted' &&
+                  searchResults.length === 0 && (
+                    <div className='col-span-full text-center text-gray-500 py-8 dark:text-gray-400'>
+                      未找到相关结果
+                    </div>
+                  )}
               </div>
+              <div
+                ref={sentinelRef}
+                className='h-px w-full'
+                aria-hidden='true'
+              />
+              <SearchLoadFooter
+                status={progressiveSearch.status}
+                hasResults={searchResults.length > 0}
+                hasMore={progressiveSearch.hasMore}
+                failedCount={progressiveSearch.failedPages.length}
+                observerSupported={observerSupported}
+                onLoadMore={() => {
+                  void progressiveSearch.loadNext(
+                    hasFilledViewportRef.current ? 'append' : 'auto'
+                  );
+                }}
+                onRetryFailed={() => {
+                  void progressiveSearch.retryFailed();
+                }}
+              />
             </section>
           ) : searchHistory.length > 0 ? (
             // 搜索历史
