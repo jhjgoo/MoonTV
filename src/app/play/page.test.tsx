@@ -212,7 +212,12 @@ describe('PlayPage player boundary', () => {
     await act(async () => {
       mockPlayerProps.onReady(mockPlayerHandle);
       mockPlayerProps.onPause(snapshot);
-      mockPlayerProps.onCanPlay(snapshot);
+      const onCanPlay = mockPlayerProps.onCanPlay;
+      expect(onCanPlay).toEqual(expect.any(Function));
+      if (!onCanPlay) {
+        throw new Error('PlayerHost must provide onCanPlay');
+      }
+      onCanPlay(snapshot);
       mockPlayerProps.onSwitchingChange?.(false);
       await Promise.resolve();
     });
